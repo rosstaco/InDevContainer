@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/rosstaco/dcode/compare/v0.5.0...v0.5.1) (2026-05-12)
+
+
+### Features
+
+* live progress spinner with streaming subprocess output ([e564cec](https://github.com/rosstaco/dcode/commit/e564cec9b8dc31ed07cc1103841481858738d3b2))
+* **shell:** auto-build missing devcontainer with live build log ([9709c28](https://github.com/rosstaco/dcode/commit/9709c28a2d3b4d9263201178eecb834ea1252ef6))
+* **shell:** auto-build missing devcontainer; resolve user from image metadata ([99521ac](https://github.com/rosstaco/dcode/commit/99521ac6973c539e6a5981abcc72c3977d9cec9d))
+
 ## [0.5.0](https://github.com/rosstaco/dcode/compare/v0.4.3...v0.5.0) (2026-05-08)
 
 
