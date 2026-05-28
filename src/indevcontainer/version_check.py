@@ -1,6 +1,6 @@
 """GitHub release version-check helper.
 
-Stdlib-only. Used by `dcode update --check` (and later by `dcode doctor`)
+Stdlib-only. Used by `idc update --check` (and later by `idc doctor`)
 to compare the local installed version against the latest GitHub release.
 """
 
@@ -11,12 +11,12 @@ import re
 import urllib.error
 import urllib.request
 
-_LATEST_URL = "https://api.github.com/repos/rosstaco/dcode/releases/latest"
-_TAGS_URL = "https://api.github.com/repos/rosstaco/dcode/tags?per_page=1"
-_RELEASE_TAG_URL = "https://github.com/rosstaco/dcode/releases/tag/{tag}"
+_LATEST_URL = "https://api.github.com/repos/rosstaco/InDevContainer/releases/latest"
+_TAGS_URL = "https://api.github.com/repos/rosstaco/InDevContainer/tags?per_page=1"
+_RELEASE_TAG_URL = "https://github.com/rosstaco/InDevContainer/releases/tag/{tag}"
 
 _HEADERS = {
-    "User-Agent": "dcode-doctor",
+    "User-Agent": "idc-doctor",
     "Accept": "application/vnd.github+json",
 }
 

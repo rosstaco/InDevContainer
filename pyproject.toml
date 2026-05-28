@@ -1,6 +1,6 @@
 [project]
-name = "dcode"
-description = "Open folders in VS Code devcontainers from the CLI"
+name = "indevcontainer"
+description = "Run code, shells, and the Copilot CLI in VS Code devcontainers from the terminal"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -8,12 +8,12 @@ dependencies = ["json5", "rich>=13.0"]
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/rosstaco/dcode"
-Issues = "https://github.com/rosstaco/dcode/issues"
-Source = "https://github.com/rosstaco/dcode"
+Homepage = "https://github.com/rosstaco/InDevContainer"
+Issues = "https://github.com/rosstaco/InDevContainer/issues"
+Source = "https://github.com/rosstaco/InDevContainer"
 
 [project.scripts]
-dcode = "dcode.cli:main"
+idc = "indevcontainer.cli:main"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -23,10 +23,10 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/dcode/_version.py"
+version-file = "src/indevcontainer/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dcode"]
+packages = ["src/indevcontainer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

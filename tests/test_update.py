@@ -1,4 +1,4 @@
-"""Tests for ``dcode.update``."""
+"""Tests for ``indevcontainer.update``."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dcode import update
-from dcode.update import detect_install_method, run_update, run_update_check
-from dcode.version_check import NetworkError
+from indevcontainer import update
+from indevcontainer.update import detect_install_method, run_update, run_update_check
+from indevcontainer.version_check import NetworkError
 
 # ---------- detect_install_method ----------
 
@@ -51,8 +51,8 @@ def test_detect_oserror_is_unknown():
         assert detect_install_method() == "unknown"
 
 
-def test_detect_uv_tool_when_dcode_listed():
-    stdout = "dcode v0.4.2\n- dcode\nfs2 v0.1.0\n- fs2\n"
+def test_detect_uv_tool_when_indevcontainer_listed():
+    stdout = "indevcontainer v0.4.2\n- indevcontainer\nfs2 v0.1.0\n- fs2\n"
     with (
         patch.object(update.shutil, "which", return_value="/usr/local/bin/uv"),
         patch.object(
@@ -64,7 +64,7 @@ def test_detect_uv_tool_when_dcode_listed():
         assert detect_install_method() == "uv-tool"
 
 
-def test_detect_not_uv_tool_when_dcode_missing():
+def test_detect_not_uv_tool_when_indevcontainer_missing():
     stdout = "fs2 v0.1.0\n- fs2\nghostcfg v0.1.3\n- gcfg\n"
     with (
         patch.object(update.shutil, "which", return_value="/usr/local/bin/uv"),
@@ -108,7 +108,7 @@ def test_run_update_uv_tool_happy_path():
     ):
         rc = run_update()
     assert rc == 0
-    mock_run.assert_called_once_with(["uv", "tool", "upgrade", "dcode"], check=False)
+    mock_run.assert_called_once_with(["uv", "tool", "upgrade", "indevcontainer"], check=False)
 
 
 def test_run_update_uv_tool_forwards_nonzero():
@@ -142,15 +142,15 @@ def test_run_update_unknown_falls_through(capsys):
 # ---------- run_update_check ----------
 
 
-_RELEASE = {"tag_name": "v0.4.2", "html_url": "https://github.com/rosstaco/dcode/releases/tag/v0.4.2"}
+_RELEASE = {"tag_name": "v0.4.2", "html_url": "https://github.com/rosstaco/InDevContainer/releases/tag/v0.4.2"}
 
 
 def test_run_update_check_up_to_date(capsys):
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(update.version_check, "get_latest_release", return_value=_RELEASE),
     ):
-        mock_dcode.__version__ = "0.4.2"
+        mock_indevcontainer.__version__ = "0.4.2"
         rc = run_update_check()
     err = capsys.readouterr().err
     assert rc == 0
@@ -161,10 +161,10 @@ def test_run_update_check_up_to_date(capsys):
 
 def test_run_update_check_behind(capsys):
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(update.version_check, "get_latest_release", return_value=_RELEASE),
     ):
-        mock_dcode.__version__ = "0.4.0"
+        mock_indevcontainer.__version__ = "0.4.0"
         rc = run_update_check()
     err = capsys.readouterr().err
     assert rc == 1
@@ -173,10 +173,10 @@ def test_run_update_check_behind(capsys):
 
 def test_run_update_check_ahead_dev(capsys):
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(update.version_check, "get_latest_release", return_value=_RELEASE),
     ):
-        mock_dcode.__version__ = "0.4.2.dev0+g1234"
+        mock_indevcontainer.__version__ = "0.4.2.dev0+g1234"
         rc = run_update_check()
     err = capsys.readouterr().err
     assert rc == 0
@@ -185,10 +185,10 @@ def test_run_update_check_ahead_dev(capsys):
 
 def test_run_update_check_strictly_ahead(capsys):
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(update.version_check, "get_latest_release", return_value=_RELEASE),
     ):
-        mock_dcode.__version__ = "0.5.0"
+        mock_indevcontainer.__version__ = "0.5.0"
         rc = run_update_check()
     err = capsys.readouterr().err
     assert rc == 0
@@ -197,14 +197,14 @@ def test_run_update_check_strictly_ahead(capsys):
 
 def test_run_update_check_network_error(capsys):
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(
             update.version_check,
             "get_latest_release",
             side_effect=NetworkError("offline"),
         ),
     ):
-        mock_dcode.__version__ = "0.4.2"
+        mock_indevcontainer.__version__ = "0.4.2"
         rc = run_update_check()
     err = capsys.readouterr().err
     assert rc == 2
@@ -216,10 +216,10 @@ def test_run_update_check_no_color_emits_no_ansi(capsys, monkeypatch):
 
     monkeypatch.setenv("NO_COLOR", "1")
     with (
-        patch.object(update, "dcode") as mock_dcode,
+        patch.object(update, "indevcontainer") as mock_indevcontainer,
         patch.object(update.version_check, "get_latest_release", return_value=_RELEASE),
     ):
-        mock_dcode.__version__ = "0.4.2"
+        mock_indevcontainer.__version__ = "0.4.2"
         run_update_check()
     err = capsys.readouterr().err
     assert "up to date" in err

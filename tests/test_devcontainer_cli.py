@@ -1,4 +1,4 @@
-"""Tests for dcode.devcontainer_cli."""
+"""Tests for indevcontainer.devcontainer_cli."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from dcode import devcontainer_cli
-from dcode._progress import StreamedResult
+from indevcontainer import devcontainer_cli
+from indevcontainer._progress import StreamedResult
 
 
 def _completed(rc: int = 0, stdout: str = "", stderr: str = "") -> SimpleNamespace:
@@ -45,7 +45,7 @@ def _ok_download_patch(payload: bytes = b"#!/bin/sh\necho ok\n"):
             return False
 
     return patch(
-        "dcode.devcontainer_cli.urllib.request.urlopen",
+        "indevcontainer.devcontainer_cli.urllib.request.urlopen",
         return_value=_Ctx(),
     )
 
@@ -58,7 +58,7 @@ def _ok_download_patch(payload: bytes = b"#!/bin/sh\necho ok\n"):
 class TestFindCli:
     def test_returns_path_when_on_path(self):
         with patch(
-            "dcode.devcontainer_cli.shutil.which",
+            "indevcontainer.devcontainer_cli.shutil.which",
             return_value="/usr/local/bin/devcontainer",
         ):
             assert devcontainer_cli.find_cli() == Path("/usr/local/bin/devcontainer")
@@ -69,16 +69,16 @@ class TestFindCli:
         binary = fake_home_bin / "devcontainer"
         _make_executable(binary)
         monkeypatch.setattr(
-            "dcode.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
+            "indevcontainer.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
         )
-        with patch("dcode.devcontainer_cli.shutil.which", return_value=None):
+        with patch("indevcontainer.devcontainer_cli.shutil.which", return_value=None):
             assert devcontainer_cli.find_cli() == binary
 
     def test_returns_none_when_missing_everywhere(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "dcode.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
+            "indevcontainer.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
         )
-        with patch("dcode.devcontainer_cli.shutil.which", return_value=None):
+        with patch("indevcontainer.devcontainer_cli.shutil.which", return_value=None):
             assert devcontainer_cli.find_cli() is None
 
     def test_default_dir_path_must_be_executable(self, tmp_path, monkeypatch):
@@ -89,9 +89,9 @@ class TestFindCli:
         binary.write_text("not really an executable")
         binary.chmod(0o644)
         monkeypatch.setattr(
-            "dcode.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
+            "indevcontainer.devcontainer_cli.DEFAULT_INSTALL_PREFIX", tmp_path
         )
-        with patch("dcode.devcontainer_cli.shutil.which", return_value=None):
+        with patch("indevcontainer.devcontainer_cli.shutil.which", return_value=None):
             assert devcontainer_cli.find_cli() is None
 
 
@@ -103,21 +103,21 @@ class TestFindCli:
 class TestCliVersion:
     def test_returns_version_string(self):
         with patch(
-            "dcode.devcontainer_cli.subprocess.run",
+            "indevcontainer.devcontainer_cli.subprocess.run",
             return_value=_completed(0, "0.86.0\n", ""),
         ):
             assert devcontainer_cli.cli_version(Path("/x/devcontainer")) == "0.86.0"
 
     def test_non_zero_returns_none(self):
         with patch(
-            "dcode.devcontainer_cli.subprocess.run",
+            "indevcontainer.devcontainer_cli.subprocess.run",
             return_value=_completed(1, "", "boom"),
         ):
             assert devcontainer_cli.cli_version(Path("/x/devcontainer")) is None
 
     def test_oserror_returns_none(self):
         with patch(
-            "dcode.devcontainer_cli.subprocess.run",
+            "indevcontainer.devcontainer_cli.subprocess.run",
             side_effect=OSError("nope"),
         ):
             assert devcontainer_cli.cli_version(Path("/x/devcontainer")) is None
@@ -143,7 +143,7 @@ class TestInstallCli:
         with (
             _ok_download_patch(),
             patch(
-                "dcode.devcontainer_cli._progress.run_streaming",
+                "indevcontainer.devcontainer_cli._progress.run_streaming",
                 side_effect=fake_run,
             ) as m,
         ):
@@ -162,7 +162,7 @@ class TestInstallCli:
         console = MagicMock()
         import urllib.error
         with patch(
-            "dcode.devcontainer_cli.urllib.request.urlopen",
+            "indevcontainer.devcontainer_cli.urllib.request.urlopen",
             side_effect=urllib.error.URLError("dns"),
         ):
             assert (
@@ -175,7 +175,7 @@ class TestInstallCli:
         with (
             _ok_download_patch(),
             patch(
-                "dcode.devcontainer_cli._progress.run_streaming",
+                "indevcontainer.devcontainer_cli._progress.run_streaming",
                 return_value=_streamed(2, "", "no permission"),
             ),
         ):
@@ -190,7 +190,7 @@ class TestInstallCli:
         with (
             _ok_download_patch(),
             patch(
-                "dcode.devcontainer_cli._progress.run_streaming",
+                "indevcontainer.devcontainer_cli._progress.run_streaming",
                 return_value=_streamed(0, "", ""),
             ),
         ):
@@ -205,7 +205,7 @@ class TestInstallCli:
         with (
             _ok_download_patch(),
             patch(
-                "dcode.devcontainer_cli._progress.run_streaming",
+                "indevcontainer.devcontainer_cli._progress.run_streaming",
                 return_value=_streamed(-1, "", "", error="missing /bin/sh"),
             ),
         ):
@@ -232,7 +232,7 @@ class TestUp:
         )
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(0, success + "\n", "log noise"),
         ) as m:
             cid, err = devcontainer_cli.up(
@@ -261,7 +261,7 @@ class TestUp:
         stdout = "preparing build...\nfetching layers...\n" + success + "\n"
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(0, stdout, ""),
         ):
             cid, err = devcontainer_cli.up(
@@ -283,7 +283,7 @@ class TestUp:
         )
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(1, err_payload + "\n", "stderr noise"),
         ):
             cid, err = devcontainer_cli.up(
@@ -304,7 +304,7 @@ class TestUp:
         # already streamed live, so the summary just points back at it.
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(2, "", "Cannot connect to docker daemon\n"),
         ):
             cid, err = devcontainer_cli.up(
@@ -321,7 +321,7 @@ class TestUp:
         # run_streaming surfaces pre-launch OSError via .error.
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(-1, "", "", error="not found"),
         ):
             cid, err = devcontainer_cli.up(
@@ -340,7 +340,7 @@ class TestUp:
         weird = json.dumps({"outcome": "success"})
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(0, weird + "\n", ""),
         ):
             cid, err = devcontainer_cli.up(
@@ -355,7 +355,7 @@ class TestUp:
     def test_zero_exit_with_unparseable_output_treated_as_failure(self, tmp_path):
         console = MagicMock()
         with patch(
-            "dcode.devcontainer_cli._progress.run_streaming",
+            "indevcontainer.devcontainer_cli._progress.run_streaming",
             return_value=_streamed(0, "totally not json", "logs"),
         ):
             cid, err = devcontainer_cli.up(

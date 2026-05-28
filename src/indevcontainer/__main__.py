@@ -1,4 +1,4 @@
-"""Allow ``python -m dcode`` to invoke the CLI."""
+"""Allow ``python -m idc`` to invoke the CLI."""
 
 from .cli import main
 

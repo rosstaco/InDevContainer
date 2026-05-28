@@ -1,4 +1,4 @@
-"""Tests for ``dcode.version_check``."""
+"""Tests for ``indevcontainer.version_check``."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dcode import version_check
-from dcode.version_check import (
+from indevcontainer import version_check
+from indevcontainer.version_check import (
     NetworkError,
     compare_versions,
     get_latest_release,
@@ -47,13 +47,13 @@ def test_get_latest_release_happy_path():
         {
             "tag_name": "v0.4.2",
             "name": "v0.4.2",
-            "html_url": "https://github.com/rosstaco/dcode/releases/tag/v0.4.2",
+            "html_url": "https://github.com/rosstaco/InDevContainer/releases/tag/v0.4.2",
         }
     ).encode()
     with patch.object(version_check.urllib.request, "urlopen", return_value=_FakeResp(payload)):
         info = get_latest_release()
     assert info["tag_name"] == "v0.4.2"
-    assert info["html_url"] == "https://github.com/rosstaco/dcode/releases/tag/v0.4.2"
+    assert info["html_url"] == "https://github.com/rosstaco/InDevContainer/releases/tag/v0.4.2"
 
 
 def test_get_latest_release_404_falls_back_to_tags():
@@ -68,7 +68,7 @@ def test_get_latest_release_404_falls_back_to_tags():
     with patch.object(version_check.urllib.request, "urlopen", side_effect=_side_effect):
         info = get_latest_release()
     assert info["tag_name"] == "v0.4.2"
-    assert info["html_url"] == "https://github.com/rosstaco/dcode/releases/tag/v0.4.2"
+    assert info["html_url"] == "https://github.com/rosstaco/InDevContainer/releases/tag/v0.4.2"
 
 
 def test_get_latest_release_empty_tags_raises():
@@ -156,7 +156,7 @@ def test_get_latest_release_sends_required_headers():
         get_latest_release()
 
     # urllib normalises header names to title case.
-    assert captured["headers"].get("User-agent") == "dcode-doctor"
+    assert captured["headers"].get("User-agent") == "idc-doctor"
     assert captured["headers"].get("Accept") == "application/vnd.github+json"
 
 

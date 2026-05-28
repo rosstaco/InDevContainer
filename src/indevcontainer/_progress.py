@@ -28,7 +28,7 @@ from typing import IO
 
 from rich.console import Console
 
-from dcode._rich import get_console
+from indevcontainer._rich import get_console
 
 
 @dataclass(frozen=True, slots=True)

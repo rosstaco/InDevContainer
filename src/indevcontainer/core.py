@@ -1,4 +1,4 @@
-"""Core dcode logic: locate devcontainers and launch VS Code."""
+"""Core idc logic: locate devcontainers and launch VS Code."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import json5
 
-from dcode._progress import with_spinner
-from dcode.wsl import _ensure_wsl_docker_settings, build_uri_wsl, is_wsl
+from indevcontainer._progress import with_spinner
+from indevcontainer.wsl import _ensure_wsl_docker_settings, build_uri_wsl, is_wsl
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -65,7 +65,7 @@ def resolve_worktree(target: Path) -> tuple[Path, Path] | None:
         rel_path = target.relative_to(main_repo)
     except ValueError:
         print(
-            "dcode: worktree is outside the main repo tree — "
+            "idc: worktree is outside the main repo tree — "
             "shared-container mode is not supported for external worktrees",
             file=sys.stderr,
         )
@@ -94,7 +94,7 @@ def get_workspace_folder(devcontainer_path: Path, target: Path) -> str:
             config = json5.load(f)
     except (OSError, ValueError) as exc:
         print(
-            f"dcode: failed to parse {devcontainer_path} ({exc}); "
+            f"idc: failed to parse {devcontainer_path} ({exc}); "
             f"using default workspace folder {default}",
             file=sys.stderr,
         )
@@ -125,7 +125,7 @@ def _launch_editor(argv: list[str], *, label: str) -> int:
                 text=True,
             )
         except OSError as exc:
-            print(f"dcode: failed to launch {argv[0]}: {exc}", file=sys.stderr)
+            print(f"idc: failed to launch {argv[0]}: {exc}", file=sys.stderr)
             return 127
 
     if result.returncode:
@@ -135,7 +135,7 @@ def _launch_editor(argv: list[str], *, label: str) -> int:
     return result.returncode
 
 
-def run_dcode(path: str, *, insiders: bool = False) -> None:
+def run_code(path: str, *, insiders: bool = False) -> None:
     """Open a folder in VS Code, using devcontainer if available."""
     editor = "code-insiders" if insiders else "code"
     target = Path(path).resolve()

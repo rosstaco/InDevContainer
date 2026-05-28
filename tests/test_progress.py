@@ -1,11 +1,11 @@
-"""Tests for dcode._progress."""
+"""Tests for indevcontainer._progress."""
 
 from __future__ import annotations
 
 import sys
 from unittest.mock import MagicMock, patch
 
-from dcode._progress import StreamedResult, run_streaming, with_spinner
+from indevcontainer._progress import StreamedResult, run_streaming, with_spinner
 
 # ---------------------------------------------------------------------------
 # with_spinner
@@ -85,7 +85,7 @@ class TestRunStreaming:
 
     def test_oserror_returns_error_field(self):
         result = run_streaming(
-            ["/this/binary/does/not/exist/dcode-test"],
+            ["/this/binary/does/not/exist/idc-test"],
             label="L",
         )
         assert result.returncode == -1
@@ -146,7 +146,7 @@ class TestRunStreaming:
 
 class TestRunStreamingMocked:
     def test_popen_invoked_with_pipes_and_text_mode(self):
-        with patch("dcode._progress.subprocess.Popen") as popen:
+        with patch("indevcontainer._progress.subprocess.Popen") as popen:
             mock_proc = MagicMock()
             mock_proc.stdout.read.return_value = ""
             mock_proc.stderr.__iter__.return_value = iter([])
