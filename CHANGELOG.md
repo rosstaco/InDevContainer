@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0](https://github.com/rosstaco/dcode/compare/v0.5.1...v1.0.0) (2026-05-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* `dcode .` no longer works; users must run `idc code .`. `dcode shell`, `dcode doctor`, and `dcode update` become `idc shell`, `idc doctor`, and `idc update`. The bare `dcode` (no args) used to open the current directory in VS Code; bare `idc` now prints help.
+* The 'dcode' tool is no longer published. Users must uninstall the old package and install the new one:
+
+### Features
+
+* rename project to InDevContainer; CLI binary becomes idc ([c60ed14](https://github.com/rosstaco/dcode/commit/c60ed14020abbf8136b59b883c6842e971348b88))
+* **research:** add findings on extending  with SSH agent forwarding and VS Code CLI bridge ([7d724db](https://github.com/rosstaco/dcode/commit/7d724dbc72c76e81c59ef808fa9c1b732b487413))
+* restructure CLI as subcommands and add idc copilot ([78d6ed8](https://github.com/rosstaco/dcode/commit/78d6ed83556265a4c946108b59b89c0d8e6520ae))
+
 ## [0.5.1](https://github.com/rosstaco/dcode/compare/v0.5.0...v0.5.1) (2026-05-12)
 
 
