@@ -1,6 +1,6 @@
 """Helpers for the official ``@devcontainers/cli`` (the ``devcontainer`` CLI).
 
-Used by ``dcode shell`` to build & start a devcontainer on demand when the
+Used by ``idc shell`` to build & start a devcontainer on demand when the
 project has no running container yet. The CLI is the same Node.js app VS
 Code's Dev Containers extension drives under the hood, so containers it
 creates carry the same ``devcontainer.local_folder`` /
@@ -31,8 +31,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from dcode import _progress
-from dcode._rich import get_console
+from indevcontainer import _progress
+from indevcontainer._rich import get_console
 
 INSTALL_SCRIPT_URL = (
     "https://raw.githubusercontent.com/devcontainers/cli/main/scripts/install.sh"
@@ -83,7 +83,7 @@ def install_cli(
 
     The upstream script bundles its own Node.js runtime, so no host Node is
     required. Defaults to ``~/.devcontainers``; pass ``prefix`` to override.
-    Prints status to *console* (defaults to the dcode stderr console). On
+    Prints status to *console* (defaults to the idc stderr console). On
     success returns the absolute path to the installed binary; on any
     failure returns ``None`` after printing a hint.
     """
@@ -91,7 +91,7 @@ def install_cli(
     install_prefix = prefix or DEFAULT_INSTALL_PREFIX
 
     cons.print(
-        f"dcode: downloading Dev Containers CLI installer from {INSTALL_SCRIPT_URL}",
+        f"idc: downloading Dev Containers CLI installer from {INSTALL_SCRIPT_URL}",
         highlight=False,
     )
 
@@ -108,7 +108,7 @@ def install_cli(
                     shutil.copyfileobj(resp, tmp)
             except (urllib.error.URLError, OSError) as exc:
                 cons.print(
-                    f"[red]dcode: failed to download installer ({exc})[/]",
+                    f"[red]idc: failed to download installer ({exc})[/]",
                     highlight=False,
                 )
                 return None
@@ -121,13 +121,13 @@ def install_cli(
         )
         if result.error is not None:
             cons.print(
-                f"[red]dcode: failed to run installer: {result.error}[/]",
+                f"[red]idc: failed to run installer: {result.error}[/]",
                 highlight=False,
             )
             return None
         if result.returncode != 0:
             cons.print(
-                f"[red]dcode: Dev Containers CLI install failed "
+                f"[red]idc: Dev Containers CLI install failed "
                 f"(exit {result.returncode}) — see output above[/]",
                 highlight=False,
             )
@@ -141,14 +141,14 @@ def install_cli(
     binary = install_prefix / "bin" / "devcontainer"
     if not (binary.is_file() and os.access(binary, os.X_OK)):
         cons.print(
-            f"[red]dcode: installer reported success but {binary} is not "
+            f"[red]idc: installer reported success but {binary} is not "
             "an executable file[/]",
             highlight=False,
         )
         return None
 
     cons.print(
-        f"[green]dcode: installed Dev Containers CLI at {binary}[/]",
+        f"[green]idc: installed Dev Containers CLI at {binary}[/]",
         highlight=False,
     )
     return binary
@@ -165,7 +165,7 @@ def up(
 
     Runs ``<cli> up --workspace-folder <workspace> --config <config>`` while
     streaming the build's stderr live above a pinned spinner (via
-    :func:`dcode._progress.run_streaming`). devcontainers/cli writes one
+    :func:`indevcontainer._progress.run_streaming`). devcontainers/cli writes one
     final ``JSON.stringify(result)`` line to stdout when finished; we parse
     that for ``containerId``.
 

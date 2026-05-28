@@ -1,15 +1,15 @@
-"""Tests for dcode.wsl."""
+"""Tests for indevcontainer.wsl."""
 
 import json
 from unittest.mock import patch
 
-from dcode.core import build_uri
-from dcode.wsl import build_uri_wsl
+from indevcontainer.core import build_uri
+from indevcontainer.wsl import build_uri_wsl
 
 
 class TestBuildUriWsl:
     def test_builds_json_payload_with_windows_path(self):
-        with patch("dcode.wsl._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\home\\ross\\repos\\myapp"):
+        with patch("indevcontainer.wsl._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\home\\ross\\repos\\myapp"):
             uri = build_uri_wsl("/home/ross/repos/myapp", "/workspaces/myapp")
         assert "vscode-remote://dev-container+" in uri
         assert uri.endswith("/workspaces/myapp")
@@ -18,7 +18,7 @@ class TestBuildUriWsl:
         assert payload == {"hostPath": "\\\\wsl.localhost\\Ubuntu\\home\\ross\\repos\\myapp"}
 
     def test_wsl_uri_differs_from_plain(self):
-        with patch("dcode.wsl._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\home\\ross\\project"):
+        with patch("indevcontainer.wsl._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\home\\ross\\project"):
             wsl = build_uri_wsl("/home/ross/project", "/workspaces/project")
         plain = build_uri("/home/ross/project", "/workspaces/project")
         assert plain != wsl
@@ -31,10 +31,10 @@ class TestEnsureWslDockerSettings:
         settings_file.write_text('{"editor.fontSize": 14}')
 
         with (
-            patch("dcode.wsl._get_windows_vscode_settings_path", return_value=settings_file),
-            patch("dcode.wsl.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=settings_file),
+            patch("indevcontainer.wsl.get_wsl_distro", return_value="Ubuntu"),
         ):
-            from dcode.wsl import _ensure_wsl_docker_settings
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         result = json.loads(settings_file.read_text())
@@ -48,10 +48,10 @@ class TestEnsureWslDockerSettings:
         settings_file.write_text('{"dev.containers.executeInWSL": true, "other": 1}')
 
         with (
-            patch("dcode.wsl._get_windows_vscode_settings_path", return_value=settings_file),
-            patch("dcode.wsl.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=settings_file),
+            patch("indevcontainer.wsl.get_wsl_distro", return_value="Ubuntu"),
         ):
-            from dcode.wsl import _ensure_wsl_docker_settings
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         result = json.loads(settings_file.read_text())
@@ -69,10 +69,10 @@ class TestEnsureWslDockerSettings:
         settings_file.write_text(original)
 
         with (
-            patch("dcode.wsl._get_windows_vscode_settings_path", return_value=settings_file),
-            patch("dcode.wsl.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=settings_file),
+            patch("indevcontainer.wsl.get_wsl_distro", return_value="Ubuntu"),
         ):
-            from dcode.wsl import _ensure_wsl_docker_settings
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         # File content byte-identical — no rewrite happened.
@@ -90,10 +90,10 @@ class TestEnsureWslDockerSettings:
         settings_file.write_text(original)
 
         with (
-            patch("dcode.wsl._get_windows_vscode_settings_path", return_value=settings_file),
-            patch("dcode.wsl.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=settings_file),
+            patch("indevcontainer.wsl.get_wsl_distro", return_value="Ubuntu"),
         ):
-            from dcode.wsl import _ensure_wsl_docker_settings
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         new_text = settings_file.read_text()
@@ -111,10 +111,10 @@ class TestEnsureWslDockerSettings:
         settings_file.write_text(original)
 
         with (
-            patch("dcode.wsl._get_windows_vscode_settings_path", return_value=settings_file),
-            patch("dcode.wsl.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=settings_file),
+            patch("indevcontainer.wsl.get_wsl_distro", return_value="Ubuntu"),
         ):
-            from dcode.wsl import _ensure_wsl_docker_settings
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         # File untouched.
@@ -123,8 +123,8 @@ class TestEnsureWslDockerSettings:
         assert "dev.containers.executeInWSL" in capsys.readouterr().err
 
     def test_falls_back_to_hint_when_path_not_found(self, capsys):
-        with patch("dcode.wsl._get_windows_vscode_settings_path", return_value=None):
-            from dcode.wsl import _ensure_wsl_docker_settings
+        with patch("indevcontainer.wsl._get_windows_vscode_settings_path", return_value=None):
+            from indevcontainer.wsl import _ensure_wsl_docker_settings
             _ensure_wsl_docker_settings()
 
         assert "dev.containers.executeInWSL" in capsys.readouterr().err

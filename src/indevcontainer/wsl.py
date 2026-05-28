@@ -1,4 +1,4 @@
-"""WSL-specific helpers for dcode."""
+"""WSL-specific helpers for idc."""
 
 from __future__ import annotations
 
@@ -190,7 +190,7 @@ def _ensure_wsl_docker_settings(insiders: bool = False) -> None:
         settings_path.write_text(new_text)
         suffix = f" ({distro})" if distro else ""
         print(
-            f"dcode: configured VS Code to use Docker from WSL{suffix}",
+            f"idc: configured VS Code to use Docker from WSL{suffix}",
             file=sys.stderr,
         )
     except OSError:

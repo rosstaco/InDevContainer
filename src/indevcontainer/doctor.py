@@ -1,8 +1,8 @@
-"""Implementation of the ``dcode doctor`` subcommand.
+"""Implementation of the ``idc doctor`` subcommand.
 
 Diagnoses the local environment (editor, container runtime, git, WSL setup,
-devcontainer in target, dcode version, install method) and prints a
-"what would `dcode <path>` do" plan summary. Read-only — never patches
+devcontainer in target, idc version, install method) and prints a
+"what would `idc code <path>` do" plan summary. Read-only — never patches
 settings.json or spawns the editor.
 """
 
@@ -19,16 +19,16 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-import dcode
-from dcode import devcontainer_cli, update, version_check
-from dcode._rich import STATUS_STYLES, get_console
-from dcode.core import (
+import indevcontainer
+from indevcontainer import devcontainer_cli, update, version_check
+from indevcontainer._rich import STATUS_STYLES, get_console
+from indevcontainer.core import (
     build_uri,
     find_devcontainer,
     get_workspace_folder,
     resolve_worktree,
 )
-from dcode.wsl import (
+from indevcontainer.wsl import (
     _get_windows_vscode_settings_path,
     _wsl_to_windows_path,
     build_uri_wsl,
@@ -172,7 +172,7 @@ def check_devcontainer_cli() -> CheckResult:
             "warn",
             "Dev Containers CLI: not on PATH "
             f"or at {devcontainer_cli.DEFAULT_INSTALL_PREFIX}/bin/devcontainer "
-            "(needed by `dcode shell` to build a missing devcontainer)",
+            "(needed by `idc shell` to build a missing devcontainer)",
             devcontainer_cli.install_hint(),
         )
     version = devcontainer_cli.cli_version(cli)
@@ -204,7 +204,7 @@ def check_wsl_distro() -> CheckResult:
     return (
         "warn",
         "WSL distro: WSL_DISTRO_NAME not set",
-        "dcode cannot auto-set dev.containers.executeInWSLDistro without "
+        "idc cannot auto-set dev.containers.executeInWSLDistro without "
         "WSL_DISTRO_NAME — set it in your shell rc",
     )
 
@@ -242,7 +242,7 @@ def check_wsl_executeInWSL_settings() -> list[CheckResult]:
                 (
                     "warn",
                     f"WSL devcontainer settings ({label}): failed to parse {path} ({exc})",
-                    "dcode auto-patches these on launch; or set them manually in settings.json",
+                    "idc auto-patches these on launch; or set them manually in settings.json",
                 )
             )
             continue
@@ -262,8 +262,8 @@ def check_wsl_executeInWSL_settings() -> list[CheckResult]:
                 (
                     "warn",
                     f"WSL devcontainer settings ({label}): {'; '.join(problems)} "
-                    '(will auto-fix on next "dcode <path>")',
-                    "dcode auto-patches these on launch; or set them manually in settings.json",
+                    '(will auto-fix on next "idc code <path>")',
+                    "idc auto-patches these on launch; or set them manually in settings.json",
                 )
             )
         else:
@@ -288,7 +288,7 @@ def check_devcontainer(target: Path) -> CheckResult:
         return (
             "warn",
             f"devcontainer: none in main repo ({main_repo}) — "
-            "dcode will fall back to opening the directory directly",
+            "idc will fall back to opening the directory directly",
             "add .devcontainer/devcontainer.json to enable container support",
         )
     devcontainer = find_devcontainer(target)
@@ -297,7 +297,7 @@ def check_devcontainer(target: Path) -> CheckResult:
     return (
         "warn",
         f"devcontainer: none found in {target} — "
-        "dcode will open the folder directly without a container",
+        "idc will open the folder directly without a container",
         "add .devcontainer/devcontainer.json to enable container support",
     )
 
@@ -337,32 +337,32 @@ def check_worktree(target: Path) -> CheckResult:
             "warn",
             f"worktree: {target} looks like a worktree or submodule but cannot be "
             "resolved (external worktree or submodule)",
-            "dcode opens this path directly without shared-container support",
+            "idc opens this path directly without shared-container support",
         )
     return ("ok", "worktree: not a git repo", None)
 
 
 def check_version() -> CheckResult:
-    local = dcode.__version__
+    local = indevcontainer.__version__
     try:
         info = version_check.get_latest_release()
     except version_check.NetworkError as exc:
         return (
             "warn",
-            f"dcode version: cannot reach GitHub API ({exc})",
-            're-run when online; or skip with "dcode update --check"',
+            f"idc version: cannot reach GitHub API ({exc})",
+            're-run when online; or skip with "idc update --check"',
         )
     latest_tag = info["tag_name"]
     url = info["html_url"]
     try:
         cmp = version_check.compare_versions(local, latest_tag.lstrip("v"))
     except ValueError:
-        return ("warn", f"dcode version: cannot parse local version {local!r}", None)
+        return ("warn", f"idc version: cannot parse local version {local!r}", None)
     if cmp < 0:
         return (
             "warn",
-            f"dcode version: {local} installed; latest is {latest_tag} ({url})",
-            'run "dcode update" to upgrade',
+            f"idc version: {local} installed; latest is {latest_tag} ({url})",
+            'run "idc update" to upgrade',
         )
     try:
         _, local_is_dev = version_check.parse_version(local)
@@ -371,10 +371,10 @@ def check_version() -> CheckResult:
     if cmp > 0 or local_is_dev:
         return (
             "ok",
-            f"dcode version: {local} (ahead of latest release {latest_tag})",
+            f"idc version: {local} (ahead of latest release {latest_tag})",
             None,
         )
-    return ("ok", f"dcode version: {local} (latest)", None)
+    return ("ok", f"idc version: {local} (latest)", None)
 
 
 def check_install_method() -> CheckResult:
@@ -382,22 +382,22 @@ def check_install_method() -> CheckResult:
     if method == "uv-tool":
         return (
             "ok",
-            'install method: uv tool (upgradable via "dcode update")',
+            'install method: uv tool (upgradable via "idc update")',
             None,
         )
     if method == "uv-missing":
         return (
             "warn",
             "install method: uv not on PATH; cannot detect or upgrade automatically",
-            'install uv (https://docs.astral.sh/uv/) to enable "dcode update"',
+            'install uv (https://docs.astral.sh/uv/) to enable "idc update"',
         )
     if method == "not-uv-tool":
         return (
             "warn",
-            'install method: dcode is not installed via "uv tool" — '
-            '"dcode update" will not work',
-            "re-install via \"uv tool install git+https://github.com/rosstaco/dcode\" "
-            "to use dcode update",
+            'install method: idc is not installed via "uv tool" — '
+            '"idc update" will not work',
+            "re-install via \"uv tool install git+https://github.com/rosstaco/InDevContainer\" "
+            "to use idc update",
         )
     return (
         "warn",
@@ -475,7 +475,7 @@ def _build_plan_renderable(
     if code_present:
         editor = "code"
         extra_note = (
-            "also available: `dcode -i <path>` would use code-insiders"
+            "also available: `idc code -i <path>` would use code-insiders"
             if insiders_present
             else None
         )
@@ -617,7 +617,7 @@ _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Git", ("git",)),
     ("WSL", ("wsl", "wsl_distro", "wsl_settings_paths", "wsl_execute_in_wsl")),
     ("Workspace", ("devcontainer", "devcontainer_parses", "worktree")),
-    ("dcode", ("version", "install_method")),
+    ("InDevContainer", ("version", "install_method")),
 )
 
 
@@ -699,7 +699,7 @@ def run_doctor(path: Path, console: Console | None = None) -> int:
     fail_style = "bold red" if n_fail > 0 else "dim"
     cons.print()
     cons.print(
-        f"dcode doctor: [green]{n_ok} ok[/], "
+        f"idc doctor: [green]{n_ok} ok[/], "
         f"[yellow]{n_warn} warn[/], [{fail_style}]{n_fail} fail[/]"
     )
 

@@ -1,4 +1,4 @@
-"""Tests for ``dcode doctor`` checks, plan summary, and driver."""
+"""Tests for ``idc doctor`` checks, plan summary, and driver."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 from conftest import _make_worktree
 
-from dcode import doctor
+from indevcontainer import doctor
 
 # ---------------------------------------------------------------------------
 # check_editor
@@ -21,7 +21,7 @@ from dcode import doctor
 
 class TestCheckEditor:
     def test_both_present(self):
-        with patch("dcode.doctor.shutil.which", side_effect=lambda x: f"/u/{x}"):
+        with patch("indevcontainer.doctor.shutil.which", side_effect=lambda x: f"/u/{x}"):
             status, msg, hint = doctor.check_editor()
         assert status == "ok"
         assert "code" in msg and "code-insiders" in msg
@@ -29,7 +29,7 @@ class TestCheckEditor:
 
     def test_only_code(self):
         with patch(
-            "dcode.doctor.shutil.which",
+            "indevcontainer.doctor.shutil.which",
             side_effect=lambda x: "/u/code" if x == "code" else None,
         ):
             status, msg, hint = doctor.check_editor()
@@ -39,7 +39,7 @@ class TestCheckEditor:
 
     def test_only_insiders(self):
         with patch(
-            "dcode.doctor.shutil.which",
+            "indevcontainer.doctor.shutil.which",
             side_effect=lambda x: "/u/code-insiders" if x == "code-insiders" else None,
         ):
             status, msg, hint = doctor.check_editor()
@@ -47,7 +47,7 @@ class TestCheckEditor:
         assert "code not on PATH" in msg
 
     def test_neither(self):
-        with patch("dcode.doctor.shutil.which", return_value=None):
+        with patch("indevcontainer.doctor.shutil.which", return_value=None):
             status, msg, hint = doctor.check_editor()
         assert status == "fail"
         assert "neither" in msg
@@ -63,8 +63,8 @@ class TestCheckExtension:
     def test_present(self):
         cp = CompletedProcess([], 0, "ms-vscode-remote.remote-containers\nfoo.bar\n", "")
         with (
-            patch("dcode.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
-            patch("dcode.doctor.subprocess.run", return_value=cp),
+            patch("indevcontainer.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
+            patch("indevcontainer.doctor.subprocess.run", return_value=cp),
         ):
             status, msg, hint = doctor.check_extension()
         assert status == "ok"
@@ -74,8 +74,8 @@ class TestCheckExtension:
     def test_missing(self):
         cp = CompletedProcess([], 0, "foo.bar\n", "")
         with (
-            patch("dcode.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
-            patch("dcode.doctor.subprocess.run", return_value=cp),
+            patch("indevcontainer.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
+            patch("indevcontainer.doctor.subprocess.run", return_value=cp),
         ):
             status, msg, hint = doctor.check_extension()
         assert status == "fail"
@@ -84,8 +84,8 @@ class TestCheckExtension:
 
     def test_subprocess_oserror_warns(self):
         with (
-            patch("dcode.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
-            patch("dcode.doctor.subprocess.run", side_effect=OSError("boom")),
+            patch("indevcontainer.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
+            patch("indevcontainer.doctor.subprocess.run", side_effect=OSError("boom")),
         ):
             status, msg, hint = doctor.check_extension()
         assert status == "warn"
@@ -94,14 +94,14 @@ class TestCheckExtension:
     def test_returncode_nonzero_warns(self):
         cp = CompletedProcess([], 1, "", "boom")
         with (
-            patch("dcode.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
-            patch("dcode.doctor.subprocess.run", return_value=cp),
+            patch("indevcontainer.doctor.shutil.which", side_effect=lambda x: "/u/code" if x == "code" else None),
+            patch("indevcontainer.doctor.subprocess.run", return_value=cp),
         ):
             status, _, _ = doctor.check_extension()
         assert status == "warn"
 
     def test_no_editor_skips(self):
-        with patch("dcode.doctor.shutil.which", return_value=None):
+        with patch("indevcontainer.doctor.shutil.which", return_value=None):
             status, msg, _ = doctor.check_extension()
         assert status == "skip"
         assert "no editor" in msg
@@ -116,8 +116,8 @@ class TestCheckDocker:
     def test_ok(self):
         cp = CompletedProcess([], 0, "29.4.0\n", "")
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/docker"),
-            patch("dcode.doctor.subprocess.run", return_value=cp),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/docker"),
+            patch("indevcontainer.doctor.subprocess.run", return_value=cp),
         ):
             status, msg, _ = doctor.check_docker()
         assert status == "ok"
@@ -126,8 +126,8 @@ class TestCheckDocker:
     def test_daemon_down_fails(self):
         cp = CompletedProcess([], 1, "", "Cannot connect")
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/docker"),
-            patch("dcode.doctor.subprocess.run", return_value=cp),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/docker"),
+            patch("indevcontainer.doctor.subprocess.run", return_value=cp),
         ):
             status, msg, hint = doctor.check_docker()
         assert status == "fail"
@@ -135,7 +135,7 @@ class TestCheckDocker:
         assert hint
 
     def test_no_cli_warns(self):
-        with patch("dcode.doctor.shutil.which", return_value=None):
+        with patch("indevcontainer.doctor.shutil.which", return_value=None):
             status, msg, hint = doctor.check_docker()
         assert status == "warn"
         assert "not on PATH" in msg
@@ -143,9 +143,9 @@ class TestCheckDocker:
 
     def test_timeout_fails(self):
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/docker"),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/docker"),
             patch(
-                "dcode.doctor.subprocess.run",
+                "indevcontainer.doctor.subprocess.run",
                 side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
             ),
         ):
@@ -161,13 +161,13 @@ class TestCheckDocker:
 
 class TestCheckGit:
     def test_present(self):
-        with patch("dcode.doctor.shutil.which", return_value="/usr/bin/git"):
+        with patch("indevcontainer.doctor.shutil.which", return_value="/usr/bin/git"):
             status, msg, _ = doctor.check_git()
         assert status == "ok"
         assert "/usr/bin/git" in msg
 
     def test_missing_warns(self):
-        with patch("dcode.doctor.shutil.which", return_value=None):
+        with patch("indevcontainer.doctor.shutil.which", return_value=None):
             status, _, hint = doctor.check_git()
         assert status == "warn"
         assert hint
@@ -182,11 +182,11 @@ class TestCheckDevcontainerCli:
     def test_present_with_version(self):
         with (
             patch(
-                "dcode.doctor.devcontainer_cli.find_cli",
+                "indevcontainer.doctor.devcontainer_cli.find_cli",
                 return_value=Path("/u/local/bin/devcontainer"),
             ),
             patch(
-                "dcode.doctor.devcontainer_cli.cli_version",
+                "indevcontainer.doctor.devcontainer_cli.cli_version",
                 return_value="0.86.0",
             ),
         ):
@@ -199,17 +199,17 @@ class TestCheckDevcontainerCli:
     def test_present_without_version_still_ok(self):
         with (
             patch(
-                "dcode.doctor.devcontainer_cli.find_cli",
+                "indevcontainer.doctor.devcontainer_cli.find_cli",
                 return_value=Path("/x/devcontainer"),
             ),
-            patch("dcode.doctor.devcontainer_cli.cli_version", return_value=None),
+            patch("indevcontainer.doctor.devcontainer_cli.cli_version", return_value=None),
         ):
             status, msg, _ = doctor.check_devcontainer_cli()
         assert status == "ok"
         assert "/x/devcontainer" in msg
 
     def test_missing_warns_with_install_hint(self):
-        with patch("dcode.doctor.devcontainer_cli.find_cli", return_value=None):
+        with patch("indevcontainer.doctor.devcontainer_cli.find_cli", return_value=None):
             status, msg, hint = doctor.check_devcontainer_cli()
         assert status == "warn"
         assert "not on PATH" in msg
@@ -225,13 +225,13 @@ class TestCheckDevcontainerCli:
 
 class TestCheckWsl:
     def test_not_in_wsl(self):
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             status, msg, _ = doctor.check_wsl()
         assert status == "ok"
         assert "not running in WSL" in msg
 
     def test_in_wsl(self):
-        with patch("dcode.doctor.is_wsl", return_value=True):
+        with patch("indevcontainer.doctor.is_wsl", return_value=True):
             status, msg, _ = doctor.check_wsl()
         assert status == "ok"
         assert "detected" in msg
@@ -239,13 +239,13 @@ class TestCheckWsl:
 
 class TestCheckWslDistro:
     def test_present(self):
-        with patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"):
+        with patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"):
             status, msg, _ = doctor.check_wsl_distro()
         assert status == "ok"
         assert "Ubuntu" in msg
 
     def test_missing(self):
-        with patch("dcode.doctor.get_wsl_distro", return_value=None):
+        with patch("indevcontainer.doctor.get_wsl_distro", return_value=None):
             status, _, hint = doctor.check_wsl_distro()
         assert status == "warn"
         assert hint
@@ -254,7 +254,7 @@ class TestCheckWslDistro:
 class TestCheckWslSettingsPaths:
     def test_resolves(self, tmp_path):
         with patch(
-            "dcode.doctor._get_windows_vscode_settings_path",
+            "indevcontainer.doctor._get_windows_vscode_settings_path",
             side_effect=lambda insiders: tmp_path / ("ins" if insiders else "stable"),
         ):
             results = doctor.check_wsl_settings_paths()
@@ -262,7 +262,7 @@ class TestCheckWslSettingsPaths:
         assert len(results) == 2
 
     def test_unresolvable_warns(self):
-        with patch("dcode.doctor._get_windows_vscode_settings_path", return_value=None):
+        with patch("indevcontainer.doctor._get_windows_vscode_settings_path", return_value=None):
             results = doctor.check_wsl_settings_paths()
         assert all(r[0] == "warn" for r in results)
 
@@ -275,9 +275,9 @@ class TestCheckWslExecuteInWslSettings:
             "dev.containers.executeInWSLDistro": "Ubuntu",
         }))
         with (
-            patch("dcode.doctor._get_windows_vscode_settings_path",
+            patch("indevcontainer.doctor._get_windows_vscode_settings_path",
                   side_effect=lambda insiders: settings if not insiders else None),
-            patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"),
         ):
             results = doctor.check_wsl_executeInWSL_settings()
         assert results
@@ -287,9 +287,9 @@ class TestCheckWslExecuteInWslSettings:
         settings = tmp_path / "settings.json"
         settings.write_text("{}")
         with (
-            patch("dcode.doctor._get_windows_vscode_settings_path",
+            patch("indevcontainer.doctor._get_windows_vscode_settings_path",
                   side_effect=lambda insiders: settings if not insiders else None),
-            patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"),
         ):
             results = doctor.check_wsl_executeInWSL_settings()
         assert results[0][0] == "warn"
@@ -298,9 +298,9 @@ class TestCheckWslExecuteInWslSettings:
         settings = tmp_path / "settings.json"
         settings.write_text("{ not json")
         with (
-            patch("dcode.doctor._get_windows_vscode_settings_path",
+            patch("indevcontainer.doctor._get_windows_vscode_settings_path",
                   side_effect=lambda insiders: settings if not insiders else None),
-            patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"),
         ):
             results = doctor.check_wsl_executeInWSL_settings()
         assert results[0][0] == "warn"
@@ -413,9 +413,9 @@ class TestCheckWorktree:
 class TestCheckVersion:
     def test_up_to_date(self):
         with (
-            patch("dcode.doctor.dcode.__version__", "0.4.2"),
+            patch("indevcontainer.doctor.indevcontainer.__version__", "0.4.2"),
             patch(
-                "dcode.doctor.version_check.get_latest_release",
+                "indevcontainer.doctor.version_check.get_latest_release",
                 return_value={"tag_name": "v0.4.2", "html_url": "https://x"},
             ),
         ):
@@ -425,22 +425,22 @@ class TestCheckVersion:
 
     def test_behind(self):
         with (
-            patch("dcode.doctor.dcode.__version__", "0.4.1"),
+            patch("indevcontainer.doctor.indevcontainer.__version__", "0.4.1"),
             patch(
-                "dcode.doctor.version_check.get_latest_release",
+                "indevcontainer.doctor.version_check.get_latest_release",
                 return_value={"tag_name": "v0.4.2", "html_url": "https://x"},
             ),
         ):
             status, msg, hint = doctor.check_version()
         assert status == "warn"
         assert "https://x" in msg
-        assert hint and "dcode update" in hint
+        assert hint and "idc update" in hint
 
     def test_ahead_dev(self):
         with (
-            patch("dcode.doctor.dcode.__version__", "0.4.2.dev1+g123"),
+            patch("indevcontainer.doctor.indevcontainer.__version__", "0.4.2.dev1+g123"),
             patch(
-                "dcode.doctor.version_check.get_latest_release",
+                "indevcontainer.doctor.version_check.get_latest_release",
                 return_value={"tag_name": "v0.4.2", "html_url": "https://x"},
             ),
         ):
@@ -449,10 +449,10 @@ class TestCheckVersion:
         assert "ahead" in msg
 
     def test_network_error_warns(self):
-        from dcode.version_check import NetworkError
+        from indevcontainer.version_check import NetworkError
 
         with patch(
-            "dcode.doctor.version_check.get_latest_release",
+            "indevcontainer.doctor.version_check.get_latest_release",
             side_effect=NetworkError("offline"),
         ):
             status, msg, hint = doctor.check_version()
@@ -468,26 +468,26 @@ class TestCheckVersion:
 
 class TestCheckInstallMethod:
     def test_uv_tool(self):
-        with patch("dcode.doctor.update.detect_install_method", return_value="uv-tool"):
+        with patch("indevcontainer.doctor.update.detect_install_method", return_value="uv-tool"):
             status, msg, _ = doctor.check_install_method()
         assert status == "ok"
         assert "uv tool" in msg
 
     def test_not_uv_tool(self):
-        with patch("dcode.doctor.update.detect_install_method", return_value="not-uv-tool"):
+        with patch("indevcontainer.doctor.update.detect_install_method", return_value="not-uv-tool"):
             status, _, hint = doctor.check_install_method()
         assert status == "warn"
         assert hint and "uv tool install" in hint
 
     def test_uv_missing(self):
-        with patch("dcode.doctor.update.detect_install_method", return_value="uv-missing"):
+        with patch("indevcontainer.doctor.update.detect_install_method", return_value="uv-missing"):
             status, msg, hint = doctor.check_install_method()
         assert status == "warn"
         assert "uv" in msg
         assert hint
 
     def test_unknown(self):
-        with patch("dcode.doctor.update.detect_install_method", return_value="unknown"):
+        with patch("indevcontainer.doctor.update.detect_install_method", return_value="unknown"):
             status, _, _ = doctor.check_install_method()
         assert status == "warn"
 
@@ -504,7 +504,7 @@ class TestRenderPlan:
         assert "no editor available" in err
 
     def test_no_devcontainer_no_worktree(self, tmp_path, capsys):
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "directly" in err
@@ -514,7 +514,7 @@ class TestRenderPlan:
         dc = tmp_path / ".devcontainer"
         dc.mkdir()
         (dc / "devcontainer.json").write_text('{"workspaceFolder": "/work"}')
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "devcontainer.json" in err
@@ -527,7 +527,7 @@ class TestRenderPlan:
         dc = main_repo / ".devcontainer"
         dc.mkdir()
         (dc / "devcontainer.json").write_text('{"workspaceFolder": "/work"}')
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(worktree, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "MAIN repo" in err
@@ -535,7 +535,7 @@ class TestRenderPlan:
 
     def test_external_worktree(self, tmp_path, capsys):
         (tmp_path / ".git").write_text("gitdir: /elsewhere/that/does/not/exist\n")
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "cannot be resolved" in err
@@ -547,10 +547,10 @@ class TestRenderPlan:
         settings = tmp_path / "settings.json"
         settings.write_text("{}")
         with (
-            patch("dcode.doctor.is_wsl", return_value=True),
-            patch("dcode.doctor._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\x"),
-            patch("dcode.doctor._get_windows_vscode_settings_path", return_value=settings),
-            patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.doctor.is_wsl", return_value=True),
+            patch("indevcontainer.doctor._wsl_to_windows_path", return_value="\\\\wsl.localhost\\Ubuntu\\x"),
+            patch("indevcontainer.doctor._get_windows_vscode_settings_path", return_value=settings),
+            patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"),
         ):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
@@ -567,30 +567,30 @@ class TestRenderPlan:
             "dev.containers.executeInWSLDistro": "Ubuntu",
         }))
         with (
-            patch("dcode.doctor.is_wsl", return_value=True),
-            patch("dcode.doctor._wsl_to_windows_path", return_value="\\\\wsl\\Ubuntu\\x"),
-            patch("dcode.doctor._get_windows_vscode_settings_path", return_value=settings),
-            patch("dcode.doctor.get_wsl_distro", return_value="Ubuntu"),
+            patch("indevcontainer.doctor.is_wsl", return_value=True),
+            patch("indevcontainer.doctor._wsl_to_windows_path", return_value="\\\\wsl\\Ubuntu\\x"),
+            patch("indevcontainer.doctor._get_windows_vscode_settings_path", return_value=settings),
+            patch("indevcontainer.doctor.get_wsl_distro", return_value="Ubuntu"),
         ):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "already correct" in err
 
     def test_editor_only_code_no_note(self, tmp_path, capsys):
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=False)
         err = capsys.readouterr().err
         assert "also available" not in err
 
     def test_editor_both_shows_note(self, tmp_path, capsys):
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=True, insiders_present=True)
         err = capsys.readouterr().err
         assert "also available" in err
         assert "code-insiders" in err
 
     def test_editor_only_insiders(self, tmp_path, capsys):
-        with patch("dcode.doctor.is_wsl", return_value=False):
+        with patch("indevcontainer.doctor.is_wsl", return_value=False):
             doctor.render_plan(tmp_path, code_present=False, insiders_present=True)
         err = capsys.readouterr().err
         assert "code-insiders" in err
@@ -609,10 +609,10 @@ def _all_ok(*_args, **_kw):
 class TestRunDoctor:
     def test_no_failures_exits_0(self, tmp_path, capsys):
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/x"),
-            patch("dcode.doctor.is_wsl", return_value=False),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/x"),
+            patch("indevcontainer.doctor.is_wsl", return_value=False),
             patch.multiple(
-                "dcode.doctor",
+                "indevcontainer.doctor",
                 check_editor=lambda: ("ok", "e", None),
                 check_extension=lambda: ("ok", "x", None),
                 check_docker=lambda: ("ok", "d", None),
@@ -628,15 +628,15 @@ class TestRunDoctor:
             rc = doctor.run_doctor(tmp_path)
         assert rc == 0
         err = capsys.readouterr().err
-        assert "dcode doctor:" in err
+        assert "idc doctor:" in err
         assert " 0 fail" in err
 
     def test_with_failure_exits_1(self, tmp_path, capsys):
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/x"),
-            patch("dcode.doctor.is_wsl", return_value=False),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/x"),
+            patch("indevcontainer.doctor.is_wsl", return_value=False),
             patch.multiple(
-                "dcode.doctor",
+                "indevcontainer.doctor",
                 check_editor=lambda: ("ok", "e", None),
                 check_extension=lambda: ("ok", "x", None),
                 check_docker=lambda: ("fail", "d", "h"),
@@ -657,10 +657,10 @@ class TestRunDoctor:
 
     def test_summary_line_format(self, tmp_path, capsys):
         with (
-            patch("dcode.doctor.shutil.which", return_value=None),
-            patch("dcode.doctor.is_wsl", return_value=False),
+            patch("indevcontainer.doctor.shutil.which", return_value=None),
+            patch("indevcontainer.doctor.is_wsl", return_value=False),
             patch.multiple(
-                "dcode.doctor",
+                "indevcontainer.doctor",
                 check_editor=lambda: ("ok", "e", None),
                 check_extension=lambda: ("ok", "x", None),
                 check_docker=lambda: ("warn", "d", "h"),
@@ -675,14 +675,14 @@ class TestRunDoctor:
         ):
             doctor.run_doctor(tmp_path)
         err = capsys.readouterr().err
-        assert "dcode doctor: 9 ok, 2 warn, 0 fail" in err
+        assert "idc doctor: 9 ok, 2 warn, 0 fail" in err
 
     def test_plan_failure_does_not_change_exit_code(self, tmp_path, capsys):
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/x"),
-            patch("dcode.doctor.is_wsl", return_value=False),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/x"),
+            patch("indevcontainer.doctor.is_wsl", return_value=False),
             patch.multiple(
-                "dcode.doctor",
+                "indevcontainer.doctor",
                 check_editor=lambda: ("ok", "e", None),
                 check_extension=lambda: ("ok", "x", None),
                 check_docker=lambda: ("ok", "d", None),
@@ -709,10 +709,10 @@ class TestRunDoctor:
             return ("ok", "x", None)
 
         with (
-            patch("dcode.doctor.shutil.which", return_value="/u/x"),
-            patch("dcode.doctor.is_wsl", return_value=False),
+            patch("indevcontainer.doctor.shutil.which", return_value="/u/x"),
+            patch("indevcontainer.doctor.is_wsl", return_value=False),
             patch.multiple(
-                "dcode.doctor",
+                "indevcontainer.doctor",
                 check_editor=lambda: ("ok", "e", None),
                 check_extension=lambda: ("ok", "x", None),
                 check_docker=lambda: ("ok", "d", None),
@@ -743,10 +743,10 @@ _ANSI_RE = re.compile(r"\x1b\[")
 def test_run_doctor_no_color_emits_no_ansi(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv("NO_COLOR", "1")
     with (
-        patch("dcode.doctor.shutil.which", return_value="/u/x"),
-        patch("dcode.doctor.is_wsl", return_value=False),
+        patch("indevcontainer.doctor.shutil.which", return_value="/u/x"),
+        patch("indevcontainer.doctor.is_wsl", return_value=False),
         patch.multiple(
-            "dcode.doctor",
+            "indevcontainer.doctor",
             check_editor=lambda: ("ok", "e", None),
             check_extension=lambda: ("ok", "x", None),
             check_docker=lambda: ("warn", "d", "h"),
@@ -761,7 +761,7 @@ def test_run_doctor_no_color_emits_no_ansi(tmp_path, capsys, monkeypatch):
     ):
         doctor.run_doctor(tmp_path)
     err = capsys.readouterr().err
-    assert "dcode doctor:" in err
+    assert "idc doctor:" in err
     assert _ANSI_RE.search(err) is None, f"ANSI escapes leaked: {err!r}"
 
 

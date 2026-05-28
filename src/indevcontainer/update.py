@@ -1,4 +1,4 @@
-"""Implementation of the ``dcode update`` subcommand."""
+"""Implementation of the ``idc update`` subcommand."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 
-import dcode
+import indevcontainer
 
 from . import version_check
 from ._rich import get_console
 
-_DCODE_LINE = re.compile(r"^dcode\s+v\d")
+_IDC_LINE = re.compile(r"^indevcontainer\s+v\d")
 
 
 def detect_install_method() -> str:
@@ -36,47 +36,47 @@ def detect_install_method() -> str:
     if result.returncode != 0:
         return "unknown"
     for line in result.stdout.splitlines():
-        if _DCODE_LINE.match(line):
+        if _IDC_LINE.match(line):
             return "uv-tool"
     return "not-uv-tool"
 
 
 def run_update() -> int:
-    """Driver for ``dcode update`` (no flags)."""
+    """Driver for ``idc update`` (no flags)."""
     method = detect_install_method()
     if method == "uv-missing":
-        print('dcode update: "uv" is not installed or not on PATH', file=sys.stderr)
+        print('idc update: "uv" is not installed or not on PATH', file=sys.stderr)
         print(
             "  install uv: https://docs.astral.sh/uv/getting-started/installation/",
             file=sys.stderr,
         )
         return 1
     if method == "not-uv-tool":
-        print("dcode update: dcode is not installed via 'uv tool'", file=sys.stderr)
+        print("idc update: idc is not installed via 'uv tool'", file=sys.stderr)
         print(
-            "  re-install with: uv tool install git+https://github.com/rosstaco/dcode",
+            "  re-install with: uv tool install git+https://github.com/rosstaco/InDevContainer",
             file=sys.stderr,
         )
         print("  or upgrade via the original install method", file=sys.stderr)
         return 1
     if method == "unknown":
         print(
-            "dcode update: could not detect install method; attempting upgrade anyway",
+            "idc update: could not detect install method; attempting upgrade anyway",
             file=sys.stderr,
         )
     # Stream subprocess output to user's terminal — no capture.
-    result = subprocess.run(["uv", "tool", "upgrade", "dcode"], check=False)
+    result = subprocess.run(["uv", "tool", "upgrade", "indevcontainer"], check=False)
     return result.returncode
 
 
 def run_update_check(console: Console | None = None) -> int:
-    """Driver for ``dcode update --check``."""
+    """Driver for ``idc update --check``."""
     cons = console or get_console()
-    local = dcode.__version__
+    local = indevcontainer.__version__
     try:
         info = version_check.get_latest_release()
     except version_check.NetworkError as exc:
-        cons.print(f"[bold red]dcode update: could not reach github.com ({exc})[/]")
+        cons.print(f"[bold red]idc update: could not reach github.com ({exc})[/]")
         return 2
 
     latest_tag = info["tag_name"]
@@ -87,7 +87,7 @@ def run_update_check(console: Console | None = None) -> int:
     if cmp < 0:
         local_style = "yellow"
         status_line = Text.from_markup(
-            "[yellow]update available — run `dcode update`[/]"
+            "[yellow]update available — run `idc update`[/]"
         )
         rc = 1
     elif cmp > 0 or local_is_dev:
@@ -109,7 +109,7 @@ def run_update_check(console: Console | None = None) -> int:
     cons.print(
         Panel(
             body,
-            title="dcode update",
+            title="idc update",
             title_align="left",
             border_style="cyan",
             padding=(0, 1),

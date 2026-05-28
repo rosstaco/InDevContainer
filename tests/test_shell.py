@@ -1,4 +1,4 @@
-"""Tests for dcode.shell."""
+"""Tests for indevcontainer.shell."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 from conftest import _make_worktree
 
-from dcode.shell import (
+from indevcontainer.shell import (
     ContainerLookup,
     ResolvedShell,
     _build_missing_container,
@@ -93,12 +93,12 @@ class TestFindContainer:
     def _patch_run(self, results):
         """Return a MagicMock that returns successive results from `results`."""
         m = MagicMock(side_effect=results)
-        return patch("dcode.shell.subprocess.run", m), m
+        return patch("indevcontainer.shell.subprocess.run", m), m
 
     def test_two_label_hit_running(self):
         results = [_completed(0, "abc123\n", "")]
         ctx, m = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result == ContainerLookup(state="running", id="abc123")
         assert m.call_count == 1
@@ -109,7 +109,7 @@ class TestFindContainer:
     def test_single_label_fallback_uses_one_filter(self):
         results = [_completed(0, "", ""), _completed(0, "deadbeef\n", "")]
         ctx, m = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result.state == "running"
         assert result.id == "deadbeef"
@@ -123,7 +123,7 @@ class TestFindContainer:
             _completed(0, "stopped1\nstopped2\n", ""),
         ]
         ctx, m = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result.state == "stopped"
         assert result.id == "stopped1"
@@ -135,21 +135,21 @@ class TestFindContainer:
     def test_missing_when_no_results_anywhere(self):
         results = [_completed(0, "", "")] * 3
         ctx, _ = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result == ContainerLookup(state="missing")
 
     def test_ambiguous_when_two_label_returns_multiple(self):
         results = [_completed(0, "id1\nid2\nid3\n", "")]
         ctx, _ = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result.state == "ambiguous"
         assert result.ids == ("id1", "id2", "id3")
 
     def test_docker_unavailable_when_file_not_found(self):
         ctx, _ = self._patch_run([FileNotFoundError("docker not found")])
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result.state == "docker_unavailable"
         assert result.detail and "docker" in result.detail.lower()
@@ -157,7 +157,7 @@ class TestFindContainer:
     def test_docker_unavailable_when_nonzero_returncode(self):
         results = [_completed(1, "", "Cannot connect to the Docker daemon")]
         ctx, _ = self._patch_run(results)
-        with patch("dcode.shell.is_wsl", return_value=False), ctx:
+        with patch("indevcontainer.shell.is_wsl", return_value=False), ctx:
             result = find_container("/host/proj", "/host/proj/.devcontainer/devcontainer.json")
         assert result.state == "docker_unavailable"
         assert result.detail and "Docker daemon" in result.detail
@@ -166,8 +166,8 @@ class TestFindContainer:
         results = [_completed(0, "wid\n", "")]
         ctx, m = self._patch_run(results)
         with (
-            patch("dcode.shell.is_wsl", return_value=True),
-            patch("dcode.shell._wsl_to_windows_path", side_effect=lambda p: f"WIN({p})"),
+            patch("indevcontainer.shell.is_wsl", return_value=True),
+            patch("indevcontainer.shell._wsl_to_windows_path", side_effect=lambda p: f"WIN({p})"),
             ctx,
         ):
             result = find_container("/h/proj", "/h/proj/.devcontainer/devcontainer.json")
@@ -185,46 +185,46 @@ class TestFindContainer:
 
 class TestGetUserSettingsPath:
     def test_macos_default(self, monkeypatch):
-        monkeypatch.setattr("dcode.shell.platform.system", lambda: "Darwin")
-        with patch("dcode.shell.is_wsl", return_value=False):
+        monkeypatch.setattr("indevcontainer.shell.platform.system", lambda: "Darwin")
+        with patch("indevcontainer.shell.is_wsl", return_value=False):
             p = get_user_settings_path(insiders=False)
         assert p == Path.home() / "Library" / "Application Support" / "Code" / "User" / "settings.json"
 
     def test_macos_insiders(self, monkeypatch):
-        monkeypatch.setattr("dcode.shell.platform.system", lambda: "Darwin")
-        with patch("dcode.shell.is_wsl", return_value=False):
+        monkeypatch.setattr("indevcontainer.shell.platform.system", lambda: "Darwin")
+        with patch("indevcontainer.shell.is_wsl", return_value=False):
             p = get_user_settings_path(insiders=True)
         assert p is not None
         assert "Code - Insiders" in str(p)
 
     def test_linux_no_xdg(self, monkeypatch):
-        monkeypatch.setattr("dcode.shell.platform.system", lambda: "Linux")
+        monkeypatch.setattr("indevcontainer.shell.platform.system", lambda: "Linux")
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-        with patch("dcode.shell.is_wsl", return_value=False):
+        with patch("indevcontainer.shell.is_wsl", return_value=False):
             p = get_user_settings_path(insiders=False)
         assert p == Path.home() / ".config" / "Code" / "User" / "settings.json"
 
     def test_linux_with_xdg(self, monkeypatch):
-        monkeypatch.setattr("dcode.shell.platform.system", lambda: "Linux")
+        monkeypatch.setattr("indevcontainer.shell.platform.system", lambda: "Linux")
         monkeypatch.setenv("XDG_CONFIG_HOME", "/custom")
-        with patch("dcode.shell.is_wsl", return_value=False):
+        with patch("indevcontainer.shell.is_wsl", return_value=False):
             p = get_user_settings_path(insiders=False)
         assert p == Path("/custom") / "Code" / "User" / "settings.json"
 
     def test_wsl_delegates_to_windows_helper(self):
         sentinel = Path("/mnt/c/Users/me/AppData/Roaming/Code/User/settings.json")
         with (
-            patch("dcode.shell.is_wsl", return_value=True),
-            patch("dcode.shell.get_windows_vscode_settings_path", return_value=sentinel) as m,
+            patch("indevcontainer.shell.is_wsl", return_value=True),
+            patch("indevcontainer.shell.get_windows_vscode_settings_path", return_value=sentinel) as m,
         ):
             p = get_user_settings_path(insiders=True)
         assert p == sentinel
         m.assert_called_once_with(True)
 
     def test_returns_path_even_when_not_existing(self, monkeypatch):
-        monkeypatch.setattr("dcode.shell.platform.system", lambda: "Linux")
+        monkeypatch.setattr("indevcontainer.shell.platform.system", lambda: "Linux")
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-        with patch("dcode.shell.is_wsl", return_value=False):
+        with patch("indevcontainer.shell.is_wsl", return_value=False):
             p = get_user_settings_path(insiders=False)
         # Path is returned regardless of existence.
         assert p is not None
@@ -265,7 +265,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"ws-shell": {"path": "/w"}},
         }
         main_repo, user_path = self._setup(tmp_path, user, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, dc_cfg, insiders=False)
         assert r == ResolvedShell(path="/w")
 
@@ -285,7 +285,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"gamma": {"path": "/g"}},
         }
         main_repo, user_path = self._setup(tmp_path, user, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, dc_cfg, insiders=False)
         # alpha was defined only in user layer; merge preserves it.
         assert r == ResolvedShell(path="/a")
@@ -297,7 +297,7 @@ class TestResolveTerminalProfile:
         }
         workspace = {"terminal.integrated.profiles.linux": {"alpha": None}}
         main_repo, user_path = self._setup(tmp_path, user, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is None
 
@@ -305,7 +305,7 @@ class TestResolveTerminalProfile:
         user = {}
         workspace = {"terminal.integrated.defaultProfile.linux": "foo"}
         main_repo, user_path = self._setup(tmp_path, user, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is None
 
@@ -316,7 +316,7 @@ class TestResolveTerminalProfile:
         }
         workspace = {}
         main_repo, user_path = self._setup(tmp_path, user, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is None
 
@@ -326,7 +326,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"a": {"path": ["/first", "/second"]}},
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is not None
         assert r.path == "/first"
@@ -337,7 +337,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"a": {"path": "zsh"}},
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is not None
         assert r.path == "zsh"
@@ -348,7 +348,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"a": {"path": "/bin/zsh", "args": ["-l"]}},
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is not None
         assert r.args == ("-l",)
@@ -361,7 +361,7 @@ class TestResolveTerminalProfile:
             },
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is not None
         assert r.env == (("FOO", "bar"),)
@@ -378,7 +378,7 @@ class TestResolveTerminalProfile:
             },
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is not None
         # Substitution values passed through verbatim.
@@ -387,7 +387,7 @@ class TestResolveTerminalProfile:
         err = capsys.readouterr().err
         # Single warning line — count by line-prefix to avoid matching the word
         # "substitution" twice within the message body itself.
-        assert err.count("dcode: terminal profile contains") == 1
+        assert err.count("idc: terminal profile contains") == 1
 
     def test_profile_without_path_returns_none(self, tmp_path):
         workspace = {
@@ -395,7 +395,7 @@ class TestResolveTerminalProfile:
             "terminal.integrated.profiles.linux": {"a": {"args": ["-l"]}},
         }
         main_repo, user_path = self._setup(tmp_path, {}, workspace)
-        with patch("dcode.shell.get_user_settings_path", return_value=user_path):
+        with patch("indevcontainer.shell.get_user_settings_path", return_value=user_path):
             r = resolve_terminal_profile(main_repo, {}, insiders=False)
         assert r is None
 
@@ -408,7 +408,7 @@ class TestResolveTerminalProfile:
 class TestDetectLoginShell:
     def test_getent_returns_zsh(self):
         results = [_completed(0, "node:x:1000:1000::/home/node:/bin/zsh\n", "")]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert detect_login_shell("cid", "node") == "/bin/zsh"
 
     def test_nologin_falls_through_to_bash(self):
@@ -416,7 +416,7 @@ class TestDetectLoginShell:
             _completed(0, "svc:x:0:0::/:/usr/sbin/nologin\n", ""),
             _completed(0, "", ""),  # /bin/bash test -x
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert detect_login_shell("cid", "svc") == "/bin/bash"
 
     def test_false_shell_falls_through_to_bash(self):
@@ -424,7 +424,7 @@ class TestDetectLoginShell:
             _completed(0, "svc:x:0:0::/:/bin/false\n", ""),
             _completed(0, "", ""),
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert detect_login_shell("cid", "svc") == "/bin/bash"
 
     def test_getent_failure_uses_bash_when_available(self):
@@ -432,7 +432,7 @@ class TestDetectLoginShell:
             _completed(2, "", "no such user"),
             _completed(0, "", ""),  # /bin/bash exists
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert detect_login_shell("cid", "ghost") == "/bin/bash"
 
     def test_no_bash_falls_through_to_sh(self):
@@ -441,7 +441,7 @@ class TestDetectLoginShell:
             _completed(1, "", ""),  # /bin/bash test -x fails
             _completed(0, "", ""),  # /bin/sh test -x ok
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert detect_login_shell("cid", "x") == "/bin/sh"
 
     def test_exec_user_none_invokes_id_un_first(self):
@@ -450,7 +450,7 @@ class TestDetectLoginShell:
             _completed(0, "vscode:x:1000:1000::/home/vscode:/bin/zsh\n", ""),
         ]
         m = MagicMock(side_effect=results)
-        with patch("dcode.shell.subprocess.run", m):
+        with patch("indevcontainer.shell.subprocess.run", m):
             assert detect_login_shell("cid", None) == "/bin/zsh"
         # First call must be id -un:
         assert m.call_args_list[0].args[0][-2:] == ["id", "-un"]
@@ -468,7 +468,7 @@ class TestInspectContainerMetadata:
     def test_returns_list_for_array_label(self):
         label = json.dumps([{"id": "feat"}, {"remoteUser": "node"}])
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(0, label + "\n", ""),
         ) as m:
             result = _inspect_container_metadata("cid")
@@ -484,7 +484,7 @@ class TestInspectContainerMetadata:
         # Older/custom images may write a JSON object instead of an array.
         label = json.dumps({"remoteUser": "vscode"})
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(0, label + "\n", ""),
         ):
             assert _inspect_container_metadata("cid") == [{"remoteUser": "vscode"}]
@@ -492,7 +492,7 @@ class TestInspectContainerMetadata:
     def test_non_dict_array_entries_filtered(self):
         label = json.dumps([{"a": 1}, "junk", 42, None, {"b": 2}])
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(0, label + "\n", ""),
         ):
             assert _inspect_container_metadata("cid") == [{"a": 1}, {"b": 2}]
@@ -502,35 +502,35 @@ class TestInspectContainerMetadata:
         # (or "<no value>" depending on Docker version).
         for stdout in ("", "\n", "<no value>\n"):
             with patch(
-                "dcode.shell.subprocess.run",
+                "indevcontainer.shell.subprocess.run",
                 return_value=_completed(0, stdout, ""),
             ):
                 assert _inspect_container_metadata("cid") == []
 
     def test_malformed_json_returns_empty(self):
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(0, "not json at all\n", ""),
         ):
             assert _inspect_container_metadata("cid") == []
 
     def test_top_level_scalar_returns_empty(self):
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(0, '"justastring"\n', ""),
         ):
             assert _inspect_container_metadata("cid") == []
 
     def test_docker_nonzero_returns_empty(self):
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             return_value=_completed(1, "", "no such container"),
         ):
             assert _inspect_container_metadata("cid") == []
 
     def test_docker_missing_returns_empty(self):
         with patch(
-            "dcode.shell.subprocess.run",
+            "indevcontainer.shell.subprocess.run",
             side_effect=FileNotFoundError("docker"),
         ):
             assert _inspect_container_metadata("cid") == []
@@ -606,7 +606,7 @@ class TestFindSshSocket:
     def test_found_via_inspect_env(self):
         env_json = json.dumps(["FOO=bar", "SSH_AUTH_SOCK=/host/sock"])
         results = [_completed(0, env_json + "\n", "")]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") == "/host/sock"
 
     def test_inspect_empty_then_ls_single_path_with_socket(self):
@@ -615,7 +615,7 @@ class TestFindSshSocket:
             _completed(0, "/tmp/vscode-ssh-auth-1.sock\n", ""),  # ls -t
             _completed(0, "", ""),  # test -S ok
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") == "/tmp/vscode-ssh-auth-1.sock"
 
     def test_ls_multiline_uses_first(self):
@@ -626,7 +626,7 @@ class TestFindSshSocket:
             _completed(0, "/tmp/vscode-ssh-auth-newer.sock\n", ""),
             _completed(0, "", ""),
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") == "/tmp/vscode-ssh-auth-newer.sock"
 
     def test_ls_empty_returns_none(self):
@@ -634,7 +634,7 @@ class TestFindSshSocket:
             _completed(0, "[]\n", ""),
             _completed(0, "", ""),  # nothing matched
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") is None
 
     def test_ls_path_but_not_socket_returns_none(self):
@@ -643,7 +643,7 @@ class TestFindSshSocket:
             _completed(0, "/tmp/vscode-ssh-auth-x.sock\n", ""),
             _completed(1, "", ""),  # test -S fails
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") is None
 
     def test_inspect_malformed_json_falls_through(self):
@@ -651,7 +651,7 @@ class TestFindSshSocket:
             _completed(0, "not json at all\n", ""),
             _completed(0, "", ""),  # ls produces nothing
         ]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert find_ssh_socket("cid") is None
 
 
@@ -662,20 +662,20 @@ class TestFindSshSocket:
 
 class TestProbeWorkdir:
     def test_candidate_exists(self, capsys):
-        with patch("dcode.shell.subprocess.run", side_effect=[_completed(0, "", "")]):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=[_completed(0, "", "")]):
             assert probe_workdir("cid", "/workspaces/proj/sub", "/workspaces/proj") == "/workspaces/proj/sub"
         assert capsys.readouterr().err == ""
 
     def test_candidate_missing_fallback_succeeds(self, capsys):
         results = [_completed(1, "", ""), _completed(0, "", "")]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert probe_workdir("cid", "/workspaces/proj/sub", "/workspaces/proj") == "/workspaces/proj"
         err = capsys.readouterr().err
         assert "/workspaces/proj/sub" in err
 
     def test_both_fail_returns_none(self):
         results = [_completed(1, "", ""), _completed(1, "", "")]
-        with patch("dcode.shell.subprocess.run", side_effect=results):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=results):
             assert probe_workdir("cid", "/c", "/f") is None
 
 
@@ -718,18 +718,18 @@ class _RunShellHarness:
     def __enter__(self):
         self._patches = [
             patch(
-                "dcode.shell.find_container",
+                "indevcontainer.shell.find_container",
                 return_value=ContainerLookup(state="running", id=self.container_id),
             ),
             patch(
-                "dcode.shell._inspect_container_metadata",
+                "indevcontainer.shell._inspect_container_metadata",
                 return_value=list(self.metadata_entries),
             ),
-            patch("dcode.shell.find_ssh_socket", return_value=self.ssh_sock),
-            patch("dcode.shell.probe_workdir", return_value=self.workdir),
-            patch("dcode.shell.resolve_terminal_profile", return_value=self.profile),
-            patch("dcode.shell.detect_login_shell", return_value=self.login_shell),
-            patch("dcode.shell.os.execvp", self.execvp),
+            patch("indevcontainer.shell.find_ssh_socket", return_value=self.ssh_sock),
+            patch("indevcontainer.shell.probe_workdir", return_value=self.workdir),
+            patch("indevcontainer.shell.resolve_terminal_profile", return_value=self.profile),
+            patch("indevcontainer.shell.detect_login_shell", return_value=self.login_shell),
+            patch("indevcontainer.shell.os.execvp", self.execvp),
             patch("sys.stdin"),
             patch("sys.stdout"),
         ]
@@ -883,12 +883,12 @@ class TestRunShell:
             return_value=ContainerLookup(state="running", id="cid")
         )
         with (
-            patch("dcode.shell.find_container", find_mock),
-            patch("dcode.shell.find_ssh_socket", return_value=None),
-            patch("dcode.shell.probe_workdir", return_value=None),
-            patch("dcode.shell.resolve_terminal_profile", return_value=None),
-            patch("dcode.shell.detect_login_shell", return_value="/bin/sh"),
-            patch("dcode.shell.os.execvp"),
+            patch("indevcontainer.shell.find_container", find_mock),
+            patch("indevcontainer.shell.find_ssh_socket", return_value=None),
+            patch("indevcontainer.shell.probe_workdir", return_value=None),
+            patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
+            patch("indevcontainer.shell.detect_login_shell", return_value="/bin/sh"),
+            patch("indevcontainer.shell.os.execvp"),
             patch("sys.stdin") as stdin,
             patch("sys.stdout") as stdout,
         ):
@@ -913,12 +913,12 @@ class TestRunShell:
         )
         probe_mock = MagicMock(return_value="/workspaces/main-repo")
         with (
-            patch("dcode.shell.find_container", find_mock),
-            patch("dcode.shell.find_ssh_socket", return_value=None),
-            patch("dcode.shell.probe_workdir", probe_mock),
-            patch("dcode.shell.resolve_terminal_profile", return_value=None),
-            patch("dcode.shell.detect_login_shell", return_value="/bin/sh"),
-            patch("dcode.shell.os.execvp"),
+            patch("indevcontainer.shell.find_container", find_mock),
+            patch("indevcontainer.shell.find_ssh_socket", return_value=None),
+            patch("indevcontainer.shell.probe_workdir", probe_mock),
+            patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
+            patch("indevcontainer.shell.detect_login_shell", return_value="/bin/sh"),
+            patch("indevcontainer.shell.os.execvp"),
             patch("sys.stdin") as stdin,
             patch("sys.stdout") as stdout,
         ):
@@ -955,18 +955,18 @@ class TestRunShellStoppedPrompt:
         execvp = MagicMock()
         with (
             patch(
-                "dcode.shell.find_container",
+                "indevcontainer.shell.find_container",
                 return_value=ContainerLookup(
                     state="stopped", id="abc123", ids=("abc123",)
                 ),
             ),
-            patch("dcode.shell.subprocess.run", start),
-            patch("dcode.shell._inspect_container_metadata", return_value=[]),
-            patch("dcode.shell.find_ssh_socket", return_value="/host/ssh.sock"),
-            patch("dcode.shell.probe_workdir", return_value="/workspaces/proj"),
-            patch("dcode.shell.resolve_terminal_profile", return_value=None),
-            patch("dcode.shell.detect_login_shell", return_value="/bin/bash"),
-            patch("dcode.shell.os.execvp", execvp),
+            patch("indevcontainer.shell.subprocess.run", start),
+            patch("indevcontainer.shell._inspect_container_metadata", return_value=[]),
+            patch("indevcontainer.shell.find_ssh_socket", return_value="/host/ssh.sock"),
+            patch("indevcontainer.shell.probe_workdir", return_value="/workspaces/proj"),
+            patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
+            patch("indevcontainer.shell.detect_login_shell", return_value="/bin/bash"),
+            patch("indevcontainer.shell.os.execvp", execvp),
         ):
             rc = run_shell(str(proj), insiders=False, shell_override=None)
 
@@ -1110,8 +1110,8 @@ class TestPromptYesNo:
 class TestObtainOrInstallCli:
     def test_returns_existing_path_without_prompting(self, capsys):
         with (
-            patch("dcode.shell.devcontainer_cli.find_cli", return_value=Path("/x/dc")),
-            patch("dcode.shell.devcontainer_cli.install_cli") as install,
+            patch("indevcontainer.shell.devcontainer_cli.find_cli", return_value=Path("/x/dc")),
+            patch("indevcontainer.shell.devcontainer_cli.install_cli") as install,
             patch("sys.stdin", _TTYStringIO("")),
         ):
             assert _obtain_or_install_cli() == Path("/x/dc")
@@ -1121,8 +1121,8 @@ class TestObtainOrInstallCli:
 
     def test_declines_install_returns_none_with_hint(self, capsys):
         with (
-            patch("dcode.shell.devcontainer_cli.find_cli", return_value=None),
-            patch("dcode.shell.devcontainer_cli.install_cli") as install,
+            patch("indevcontainer.shell.devcontainer_cli.find_cli", return_value=None),
+            patch("indevcontainer.shell.devcontainer_cli.install_cli") as install,
             patch("sys.stdin", _TTYStringIO("n\n")),
         ):
             assert _obtain_or_install_cli() is None
@@ -1133,9 +1133,9 @@ class TestObtainOrInstallCli:
 
     def test_accepts_install_returns_installed_path(self, capsys):
         with (
-            patch("dcode.shell.devcontainer_cli.find_cli", return_value=None),
+            patch("indevcontainer.shell.devcontainer_cli.find_cli", return_value=None),
             patch(
-                "dcode.shell.devcontainer_cli.install_cli",
+                "indevcontainer.shell.devcontainer_cli.install_cli",
                 return_value=Path("/home/u/.devcontainers/bin/devcontainer"),
             ) as install,
             patch("sys.stdin", _TTYStringIO("y\n")),
@@ -1147,8 +1147,8 @@ class TestObtainOrInstallCli:
 
     def test_install_failure_returns_none(self, capsys):
         with (
-            patch("dcode.shell.devcontainer_cli.find_cli", return_value=None),
-            patch("dcode.shell.devcontainer_cli.install_cli", return_value=None),
+            patch("indevcontainer.shell.devcontainer_cli.find_cli", return_value=None),
+            patch("indevcontainer.shell.devcontainer_cli.install_cli", return_value=None),
             patch("sys.stdin", _TTYStringIO("y\n")),
         ):
             assert _obtain_or_install_cli() is None
@@ -1166,11 +1166,11 @@ class TestBuildMissingContainer:
         cfg = tmp_path / "proj/.devcontainer/devcontainer.json"
         with (
             patch(
-                "dcode.shell._obtain_or_install_cli",
+                "indevcontainer.shell._obtain_or_install_cli",
                 return_value=Path("/x/devcontainer"),
             ),
             patch(
-                "dcode.shell.devcontainer_cli.up",
+                "indevcontainer.shell.devcontainer_cli.up",
                 return_value=("abc123def456", ""),
             ) as up,
         ):
@@ -1181,17 +1181,17 @@ class TestBuildMissingContainer:
         assert "abc123def456"[:12] in err  # short-id printed
 
     def test_no_cli_returns_none(self, tmp_path):
-        with patch("dcode.shell._obtain_or_install_cli", return_value=None):
+        with patch("indevcontainer.shell._obtain_or_install_cli", return_value=None):
             assert _build_missing_container(tmp_path, tmp_path / "x.json") is None
 
     def test_up_failure_prints_error_log(self, tmp_path, capsys):
         with (
             patch(
-                "dcode.shell._obtain_or_install_cli",
+                "indevcontainer.shell._obtain_or_install_cli",
                 return_value=Path("/x/devcontainer"),
             ),
             patch(
-                "dcode.shell.devcontainer_cli.up",
+                "indevcontainer.shell.devcontainer_cli.up",
                 return_value=(None, "Dockerfile RUN failed: package foo not found"),
             ),
         ):
@@ -1219,21 +1219,21 @@ class TestRunShellMissingBuild:
         proj_metadata = list(metadata_entries) if metadata_entries else []
         return [
             patch(
-                "dcode.shell.find_container",
+                "indevcontainer.shell.find_container",
                 return_value=ContainerLookup(state="missing"),
             ),
             patch(
-                "dcode.shell._build_missing_container",
+                "indevcontainer.shell._build_missing_container",
                 return_value=built_container_id,
             ),
             patch(
-                "dcode.shell._inspect_container_metadata",
+                "indevcontainer.shell._inspect_container_metadata",
                 return_value=proj_metadata,
             ),
-            patch("dcode.shell.find_ssh_socket", return_value="/host/ssh.sock"),
-            patch("dcode.shell.probe_workdir", return_value="/workspaces/proj"),
-            patch("dcode.shell.resolve_terminal_profile", return_value=None),
-            patch("dcode.shell.detect_login_shell", return_value="/bin/bash"),
+            patch("indevcontainer.shell.find_ssh_socket", return_value="/host/ssh.sock"),
+            patch("indevcontainer.shell.probe_workdir", return_value="/workspaces/proj"),
+            patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
+            patch("indevcontainer.shell.detect_login_shell", return_value="/bin/bash"),
             patch("sys.stdin", _TTYStringIO(answer)),
         ]
 
@@ -1248,7 +1248,7 @@ class TestRunShellMissingBuild:
 
         execvp = MagicMock()
         with ExitStack() as stack:
-            stack.enter_context(patch("dcode.shell.os.execvp", execvp))
+            stack.enter_context(patch("indevcontainer.shell.os.execvp", execvp))
             self._enter_all(
                 stack,
                 self._patches(answer="y\n", built_container_id="newcid"),
@@ -1269,12 +1269,12 @@ class TestRunShellMissingBuild:
         execvp = MagicMock()
         build = MagicMock()
         with (
-            patch("dcode.shell.os.execvp", execvp),
+            patch("indevcontainer.shell.os.execvp", execvp),
             patch(
-                "dcode.shell.find_container",
+                "indevcontainer.shell.find_container",
                 return_value=ContainerLookup(state="missing"),
             ),
-            patch("dcode.shell._build_missing_container", build),
+            patch("indevcontainer.shell._build_missing_container", build),
             patch("sys.stdin", _TTYStringIO("n\n")),
         ):
             rc = run_shell(str(proj), insiders=False, shell_override=None)
@@ -1293,7 +1293,7 @@ class TestRunShellMissingBuild:
 
         execvp = MagicMock()
         with ExitStack() as stack:
-            stack.enter_context(patch("dcode.shell.os.execvp", execvp))
+            stack.enter_context(patch("indevcontainer.shell.os.execvp", execvp))
             self._enter_all(
                 stack,
                 self._patches(answer="y\n", built_container_id=None),
@@ -1313,7 +1313,7 @@ class TestRunShellMissingBuild:
 
         execvp = MagicMock()
         with ExitStack() as stack:
-            stack.enter_context(patch("dcode.shell.os.execvp", execvp))
+            stack.enter_context(patch("indevcontainer.shell.os.execvp", execvp))
             self._enter_all(
                 stack,
                 self._patches(
@@ -1342,7 +1342,7 @@ class TestRunShellErrors:
             ids=ids,
             detail=detail,
         )
-        return patch("dcode.shell.find_container", return_value=lookup)
+        return patch("indevcontainer.shell.find_container", return_value=lookup)
 
     def test_missing_devcontainer(self, tmp_path, capsys):
         # tmp_path has no .devcontainer at all
@@ -1350,7 +1350,7 @@ class TestRunShellErrors:
         proj.mkdir()
         rc = run_shell(str(proj), insiders=False, shell_override=None)
         assert rc != 0
-        assert "dcode doctor" in capsys.readouterr().err
+        assert "idc doctor" in capsys.readouterr().err
 
     def test_state_missing_non_tty_message(self, tmp_path, capsys, monkeypatch):
         proj = _make_project(tmp_path)
@@ -1362,7 +1362,7 @@ class TestRunShellErrors:
         err = capsys.readouterr().err
         assert "no devcontainer is running" in err
         assert "run interactively to be prompted to build it" in err
-        assert f"dcode {proj}" in err
+        assert f"idc code {proj}" in err
 
     def test_state_stopped_non_tty_message(self, tmp_path, capsys, monkeypatch):
         proj = _make_project(tmp_path)
@@ -1373,7 +1373,7 @@ class TestRunShellErrors:
         assert rc != 0
         err = capsys.readouterr().err
         assert "run interactively to be prompted to start it" in err
-        assert f"dcode {proj}" in err
+        assert f"idc code {proj}" in err
 
     def test_state_ambiguous_lists_ids(self, tmp_path, capsys):
         proj = _make_project(tmp_path)

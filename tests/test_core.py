@@ -1,4 +1,4 @@
-"""Tests for dcode.core."""
+"""Tests for indevcontainer.core."""
 
 import json
 import subprocess
@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from conftest import _make_worktree
 
-from dcode.core import (
+from indevcontainer.core import (
     build_uri,
     find_devcontainer,
     get_workspace_folder,
@@ -113,9 +113,9 @@ class TestMain:
         dc_dir.mkdir()
         (dc_dir / "devcontainer.json").write_text('{"name": "test"}')
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(tmp_path), insiders=False)
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(tmp_path), insiders=False)
 
         args = mock_run.call_args[0][0]
         assert args[0] == "code"
@@ -127,27 +127,27 @@ class TestMain:
         dc_dir.mkdir()
         (dc_dir / "devcontainer.json").write_text('{"name": "test"}')
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(tmp_path), insiders=True)
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(tmp_path), insiders=True)
 
         args = mock_run.call_args[0][0]
         assert args[0] == "code-insiders"
 
     def test_fallback_without_devcontainer(self, tmp_path):
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(tmp_path), insiders=False)
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(tmp_path), insiders=False)
 
         args = mock_run.call_args[0][0]
         assert args == ["code", str(tmp_path)]
 
     def test_propagates_nonzero_exit_from_code_launcher(self, tmp_path):
         failed = subprocess.CompletedProcess(args=[], returncode=2)
-        with patch("dcode.core.subprocess.run", return_value=failed):
-            from dcode.core import run_dcode
+        with patch("indevcontainer.core.subprocess.run", return_value=failed):
+            from indevcontainer.core import run_code
             with pytest.raises(SystemExit) as exc:
-                run_dcode(str(tmp_path), insiders=False)
+                run_code(str(tmp_path), insiders=False)
         assert exc.value.code == 2
 
     def test_propagates_nonzero_exit_with_devcontainer(self, tmp_path):
@@ -156,10 +156,10 @@ class TestMain:
         (dc_dir / "devcontainer.json").write_text('{"name": "test"}')
 
         failed = subprocess.CompletedProcess(args=[], returncode=3)
-        with patch("dcode.core.subprocess.run", return_value=failed):
-            from dcode.core import run_dcode
+        with patch("indevcontainer.core.subprocess.run", return_value=failed):
+            from indevcontainer.core import run_code
             with pytest.raises(SystemExit) as exc:
-                run_dcode(str(tmp_path), insiders=False)
+                run_code(str(tmp_path), insiders=False)
         assert exc.value.code == 3
 
     def test_uses_wsl_uri_on_wsl(self, tmp_path):
@@ -169,13 +169,13 @@ class TestMain:
 
         unc = f"\\\\wsl.localhost\\Ubuntu{tmp_path}"
         with (
-            patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run,
-            patch("dcode.core.is_wsl", return_value=True),
-            patch("dcode.core._ensure_wsl_docker_settings"),
-            patch("dcode.wsl._wsl_to_windows_path", return_value=unc),
+            patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run,
+            patch("indevcontainer.core.is_wsl", return_value=True),
+            patch("indevcontainer.core._ensure_wsl_docker_settings"),
+            patch("indevcontainer.wsl._wsl_to_windows_path", return_value=unc),
         ):
-            from dcode.core import run_dcode
-            run_dcode(str(tmp_path), insiders=False)
+            from indevcontainer.core import run_code
+            run_code(str(tmp_path), insiders=False)
 
         args = mock_run.call_args[0][0]
         assert args[0] == "code"
@@ -271,9 +271,9 @@ class TestRunDcodeWorktree:
         dc_dir.mkdir()
         (dc_dir / "devcontainer.json").write_text('{"name": "test"}')
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(worktree))
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(worktree))
 
         args = mock_run.call_args[0][0]
         assert args[1] == "--folder-uri"
@@ -288,9 +288,9 @@ class TestRunDcodeWorktree:
         dc_dir.mkdir()
         (dc_dir / "devcontainer.json").write_text('{"name": "test"}')
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(worktree))
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(worktree))
 
         uri = mock_run.call_args[0][0][2]
         assert uri.endswith("/workspaces/main-repo/.worktrees/pr-34")
@@ -310,9 +310,9 @@ class TestRunDcodeWorktree:
             wt.mkdir(parents=True)
             (wt / ".git").write_text(f"gitdir: ../../.git/worktrees/{name}\n")
 
-            with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-                from dcode.core import run_dcode
-                run_dcode(str(wt))
+            with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+                from indevcontainer.core import run_code
+                run_code(str(wt))
             uris.append(mock_run.call_args[0][0][2])
 
         # Same hex prefix = same container
@@ -327,9 +327,9 @@ class TestRunDcodeWorktree:
     def test_worktree_falls_back_when_no_devcontainer_in_main_repo(self, tmp_path):
         main_repo, worktree = _make_worktree(tmp_path)
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(worktree))
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(worktree))
 
         args = mock_run.call_args[0][0]
         assert args == ["code", str(worktree)]
@@ -340,9 +340,9 @@ class TestRunDcodeWorktree:
         dc_dir.mkdir()
         (dc_dir / "devcontainer.json").write_text('{"workspaceFolder": "/workspace"}')
 
-        with patch("dcode.core.subprocess.run", return_value=_ok()) as mock_run:
-            from dcode.core import run_dcode
-            run_dcode(str(worktree))
+        with patch("indevcontainer.core.subprocess.run", return_value=_ok()) as mock_run:
+            from indevcontainer.core import run_code
+            run_code(str(worktree))
 
         uri = mock_run.call_args[0][0][2]
         assert uri.endswith("/workspace/.worktrees/pr-34")

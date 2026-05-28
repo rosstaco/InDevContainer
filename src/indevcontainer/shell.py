@@ -1,4 +1,4 @@
-"""dcode shell: exec into a running devcontainer.
+"""idc shell: exec into a running devcontainer.
 
 Locates the container by the Docker labels that ``devcontainers/cli`` sets
 (``devcontainer.local_folder`` and ``devcontainer.config_file``), resolves a
@@ -19,9 +19,9 @@ from typing import Literal
 
 import json5
 
-from dcode import devcontainer_cli
-from dcode.core import find_devcontainer, get_workspace_folder, resolve_worktree
-from dcode.wsl import _wsl_to_windows_path, get_windows_vscode_settings_path, is_wsl
+from indevcontainer import devcontainer_cli
+from indevcontainer.core import find_devcontainer, get_workspace_folder, resolve_worktree
+from indevcontainer.wsl import _wsl_to_windows_path, get_windows_vscode_settings_path, is_wsl
 
 _ContainerState = Literal[
     "running", "stopped", "missing", "ambiguous", "docker_unavailable"
@@ -63,18 +63,18 @@ def _load_jsonc(path: Path) -> dict:
     try:
         text = path.read_text()
     except OSError as exc:
-        print(f"dcode: failed to read {path}: {exc}", file=sys.stderr)
+        print(f"idc: failed to read {path}: {exc}", file=sys.stderr)
         return {}
     if not text.strip():
         return {}
     try:
         parsed = json5.loads(text)
     except ValueError as exc:
-        print(f"dcode: failed to parse {path}: {exc}", file=sys.stderr)
+        print(f"idc: failed to parse {path}: {exc}", file=sys.stderr)
         return {}
     if not isinstance(parsed, dict):
         print(
-            f"dcode: ignoring {path}: top-level value is not an object",
+            f"idc: ignoring {path}: top-level value is not an object",
             file=sys.stderr,
         )
         return {}
@@ -255,7 +255,7 @@ def _profile_to_resolved(
             if isinstance(a, str):
                 if "${" in a and not warn_substitution[0]:
                     print(
-                        "dcode: terminal profile contains ${...} substitution; "
+                        "idc: terminal profile contains ${...} substitution; "
                         "passing through unchanged (variable substitution is not "
                         "yet implemented)",
                         file=sys.stderr,
@@ -271,7 +271,7 @@ def _profile_to_resolved(
                 continue
             if "${" in v and not warn_substitution[0]:
                 print(
-                    "dcode: terminal profile contains ${...} substitution; "
+                    "idc: terminal profile contains ${...} substitution; "
                     "passing through unchanged (variable substitution is not "
                     "yet implemented)",
                     file=sys.stderr,
@@ -443,7 +443,7 @@ def probe_workdir(container_id: str, candidate: str, fallback: str) -> str | Non
         return candidate
     if fallback and fallback != candidate:
         print(
-            f"dcode: working directory {candidate} not found in container; "
+            f"idc: working directory {candidate} not found in container; "
             f"falling back to {fallback}",
             file=sys.stderr,
         )
@@ -538,7 +538,7 @@ def _prompt_yes_no(question: str, *, default_yes: bool) -> bool:
 
     Accepts ``y``/``yes`` (any case), declines on ``n``/``no``. An empty
     answer follows ``default_yes``. All other inputs decline. Decline
-    paths print ``dcode: aborted`` to stderr.
+    paths print ``idc: aborted`` to stderr.
     """
     suffix = "[Y/n]" if default_yes else "[y/N]"
     sys.stderr.write(f"{question} {suffix} ")
@@ -548,20 +548,20 @@ def _prompt_yes_no(question: str, *, default_yes: bool) -> bool:
         return True
     if answer == "" and default_yes:
         return True
-    print("dcode: aborted", file=sys.stderr)
+    print("idc: aborted", file=sys.stderr)
     return False
 
 
 def _prompt_start_stopped(container_id: str, host_path: str | Path) -> bool:
     """Prompt to start a stopped container and run ``docker start`` if accepted."""
     if not _prompt_yes_no(
-        f"dcode: devcontainer for {host_path} is stopped. Start it now?",
+        f"idc: devcontainer for {host_path} is stopped. Start it now?",
         default_yes=True,
     ):
         return False
 
     short_id = container_id[:12]
-    print(f"dcode: starting container {short_id}...", file=sys.stderr)
+    print(f"idc: starting container {short_id}...", file=sys.stderr)
     try:
         proc = subprocess.run(
             ["docker", "start", container_id],
@@ -570,17 +570,17 @@ def _prompt_start_stopped(container_id: str, host_path: str | Path) -> bool:
             check=False,
         )
     except (FileNotFoundError, OSError) as exc:
-        print(f"dcode: failed to start container {short_id}: {exc}", file=sys.stderr)
+        print(f"idc: failed to start container {short_id}: {exc}", file=sys.stderr)
         return False
 
     if proc.returncode != 0:
         detail = (proc.stderr or "").strip()
         if not detail:
             detail = (proc.stdout or "").strip() or f"exit code {proc.returncode}"
-        print(f"dcode: failed to start container {short_id}: {detail}", file=sys.stderr)
+        print(f"idc: failed to start container {short_id}: {detail}", file=sys.stderr)
         return False
 
-    print("dcode: container started", file=sys.stderr)
+    print("idc: container started", file=sys.stderr)
     return True
 
 
@@ -596,12 +596,12 @@ def _obtain_or_install_cli() -> Path | None:
         return cli
 
     print(
-        "dcode: Dev Containers CLI is not installed (the CLI is what builds the "
+        "idc: Dev Containers CLI is not installed (the CLI is what builds the "
         "devcontainer outside of VS Code).",
         file=sys.stderr,
     )
     if not _prompt_yes_no(
-        f"dcode: install the Dev Containers CLI now from "
+        f"idc: install the Dev Containers CLI now from "
         f"{devcontainer_cli.INSTALL_SCRIPT_URL}\n"
         f"       into {devcontainer_cli.DEFAULT_INSTALL_PREFIX} (no root needed)?",
         default_yes=False,
@@ -609,7 +609,7 @@ def _obtain_or_install_cli() -> Path | None:
         print(
             f"hint: {devcontainer_cli.install_hint()}\n"
             "  alternatively, open the project in VS Code first to build the "
-            "container, then re-run dcode shell",
+            "container, then re-run idc shell",
             file=sys.stderr,
         )
         return None
@@ -636,27 +636,56 @@ def _build_missing_container(main_repo: Path, devcontainer_path: Path) -> str | 
         return None
 
     print(
-        f"dcode: building devcontainer for {main_repo} via {cli}",
+        f"idc: building devcontainer for {main_repo} via {cli}",
         file=sys.stderr,
     )
     container_id, error_log = devcontainer_cli.up(cli, main_repo, devcontainer_path)
     if container_id is None:
-        print("dcode: devcontainer build failed", file=sys.stderr)
+        print("idc: devcontainer build failed", file=sys.stderr)
         if error_log:
             print(error_log, file=sys.stderr)
         return None
 
     short = container_id[:12]
-    print(f"dcode: devcontainer built and started ({short})", file=sys.stderr)
+    print(f"idc: devcontainer built and started ({short})", file=sys.stderr)
     return container_id
 
 
-def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
-    """Open an interactive shell in the running devcontainer for ``path``.
+@dataclass(frozen=True, slots=True)
+class ContainerExec:
+    """Everything ``docker exec`` needs to run something inside a devcontainer.
 
-    Returns an exit code suitable for ``sys.exit``. On success, replaces the
-    process via ``os.execvp`` (the explicit ``return 0`` is only reachable
-    when ``execvp`` is mocked in tests).
+    Produced by :func:`prepare_container_exec` and consumed by both
+    :func:`run_shell` and :func:`run_copilot`. Contains the resolved container
+    id, the user to ``-u`` as, the working directory to ``-w`` into, the SSH
+    agent socket to forward (or ``None``), and the parsed ``devcontainer.json``
+    so callers can layer their own logic on top (e.g. terminal-profile
+    resolution).
+    """
+
+    container_id: str
+    exec_user: str | None
+    workdir: str | None
+    ssh_sock: str | None
+    workspace_folder: str
+    devcontainer_cfg: dict
+    main_repo: Path
+    rel_path: Path | None
+
+
+def prepare_container_exec(path: str) -> ContainerExec | None:
+    """Resolve everything ``docker exec`` needs for the devcontainer at *path*.
+
+    Mirrors the container-discovery flow used by ``idc shell``: detects
+    worktrees, locates ``devcontainer.json``, looks up the running container
+    by its devcontainers/cli labels (auto-building or prompting to start
+    when needed), then inspects the container for user, workdir, and an
+    SSH agent socket.
+
+    Returns ``None`` after printing a hint to stderr if any step fails —
+    no devcontainer.json, docker unavailable, ambiguous match, missing
+    container with no TTY to prompt the user, declined prompt, or build
+    failure. Callers should propagate exit code ``1`` in that case.
     """
     target = Path(path).resolve()
 
@@ -670,11 +699,11 @@ def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
     devcontainer_path = find_devcontainer(main_repo)
     if devcontainer_path is None:
         print(
-            f"dcode: no devcontainer.json found for {main_repo}; "
-            f"run `dcode doctor` to diagnose",
+            f"idc: no devcontainer.json found for {main_repo}; "
+            f"run `idc doctor` to diagnose",
             file=sys.stderr,
         )
-        return 1
+        return None
 
     devcontainer_cfg = _load_jsonc(devcontainer_path)
     workspace_folder = get_workspace_folder(devcontainer_path, main_repo)
@@ -684,73 +713,73 @@ def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
     if lookup.state == "docker_unavailable":
         detail = lookup.detail or "unknown error"
         print(
-            f"dcode: docker CLI not available — is Docker Desktop running? "
+            f"idc: docker CLI not available — is Docker Desktop running? "
             f"({detail})",
             file=sys.stderr,
         )
-        return 1
+        return None
 
     if lookup.state == "ambiguous":
         ids = ", ".join(lookup.ids)
         print(
-            f"dcode: multiple devcontainers match {main_repo}: {ids} — "
+            f"idc: multiple devcontainers match {main_repo}: {ids} — "
             f"please remove duplicates with `docker rm`",
             file=sys.stderr,
         )
-        return 1
+        return None
 
     is_interactive = sys.stdin.isatty() and sys.stdout.isatty()
 
     if lookup.state in ("stopped", "missing") and not is_interactive:
         if lookup.state == "stopped":
             print(
-                f"dcode: devcontainer for {main_repo} exists but is stopped — "
+                f"idc: devcontainer for {main_repo} exists but is stopped — "
                 "run interactively to be prompted to start it, or run "
-                f"`dcode {path}` first",
+                f"`idc code {path}` first",
                 file=sys.stderr,
             )
         else:
             print(
-                f"dcode: no devcontainer is running for {main_repo} — "
+                f"idc: no devcontainer is running for {main_repo} — "
                 "run interactively to be prompted to build it, or run "
-                f"`dcode {path}` first",
+                f"`idc code {path}` first",
                 file=sys.stderr,
             )
-        return 1
+        return None
 
     if not is_interactive:
-        # state == "running" but no TTY for an interactive shell.
+        # state == "running" but no TTY — caller wanted an interactive exec.
         print(
-            "dcode: dcode shell requires an interactive terminal",
+            "idc: this command requires an interactive terminal",
             file=sys.stderr,
         )
-        return 1
+        return None
 
     if lookup.state == "stopped":
         stopped_id = lookup.id
         if stopped_id is None:  # pragma: no cover - defensive
-            print("dcode: container lookup returned no id", file=sys.stderr)
-            return 1
+            print("idc: container lookup returned no id", file=sys.stderr)
+            return None
         if not _prompt_start_stopped(stopped_id, main_repo):
-            return 1
+            return None
         container_id: str = stopped_id
     elif lookup.state == "missing":
         if not _prompt_yes_no(
-            f"dcode: no devcontainer is running for {main_repo}. "
+            f"idc: no devcontainer is running for {main_repo}. "
             f"Build & start it now?",
             default_yes=True,
         ):
-            return 1
+            return None
         built = _build_missing_container(main_repo, devcontainer_path)
         if built is None:
-            return 1
+            return None
         container_id = built
     else:
         # state == "running"
         running_id = lookup.id
         if running_id is None:  # pragma: no cover - defensive
-            print("dcode: container lookup returned no id", file=sys.stderr)
-            return 1
+            print("idc: container lookup returned no id", file=sys.stderr)
+            return None
         container_id = running_id
 
     metadata_entries = _inspect_container_metadata(container_id)
@@ -758,56 +787,79 @@ def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
 
     if "remoteEnv" in devcontainer_cfg:
         print(
-            "dcode: devcontainer remoteEnv is not applied to this shell yet; "
+            "idc: devcontainer remoteEnv is not applied to this exec yet; "
             "environment may differ from VS Code terminal",
             file=sys.stderr,
         )
 
-    # Resolve shell.
-    if shell_override:
-        resolved = ResolvedShell(path=shell_override)
-    else:
-        profile = resolve_terminal_profile(main_repo, devcontainer_cfg, insiders)
-        if profile is not None:
-            resolved = profile
-        else:
-            shell_path = detect_login_shell(container_id, exec_user)
-            resolved = ResolvedShell(path=shell_path)
-
-    # SSH agent socket forwarding.
     ssh_sock = find_ssh_socket(container_id)
     if ssh_sock is None:
         print(
-            "dcode: SSH agent socket not found in container — SSH key auth "
+            "idc: SSH agent socket not found in container — SSH key auth "
             "may not work (open in VS Code to enable forwarding)",
             file=sys.stderr,
         )
 
-    # Working directory probe.
     if rel_path is not None:
         candidate_workdir = f"{workspace_folder}/{rel_path.as_posix()}"
     else:
         candidate_workdir = workspace_folder
     workdir = probe_workdir(container_id, candidate_workdir, workspace_folder)
 
+    return ContainerExec(
+        container_id=container_id,
+        exec_user=exec_user,
+        workdir=workdir,
+        ssh_sock=ssh_sock,
+        workspace_folder=workspace_folder,
+        devcontainer_cfg=devcontainer_cfg,
+        main_repo=main_repo,
+        rel_path=rel_path,
+    )
+
+
+def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
+    """Open an interactive shell in the running devcontainer for ``path``.
+
+    Returns an exit code suitable for ``sys.exit``. On success, replaces the
+    process via ``os.execvp`` (the explicit ``return 0`` is only reachable
+    when ``execvp`` is mocked in tests).
+    """
+    ctx = prepare_container_exec(path)
+    if ctx is None:
+        return 1
+
+    # Resolve shell.
+    if shell_override:
+        resolved = ResolvedShell(path=shell_override)
+    else:
+        profile = resolve_terminal_profile(
+            ctx.main_repo, ctx.devcontainer_cfg, insiders
+        )
+        if profile is not None:
+            resolved = profile
+        else:
+            shell_path = detect_login_shell(ctx.container_id, ctx.exec_user)
+            resolved = ResolvedShell(path=shell_path)
+
     # Build argv.
     argv: list[str] = ["docker", "exec", "-it"]
-    if exec_user:
-        argv.extend(["-u", exec_user])
-    if workdir:
-        argv.extend(["-w", workdir])
-    if ssh_sock:
-        argv.extend(["-e", f"SSH_AUTH_SOCK={ssh_sock}"])
+    if ctx.exec_user:
+        argv.extend(["-u", ctx.exec_user])
+    if ctx.workdir:
+        argv.extend(["-w", ctx.workdir])
+    if ctx.ssh_sock:
+        argv.extend(["-e", f"SSH_AUTH_SOCK={ctx.ssh_sock}"])
     for k, v in resolved.env:
         argv.extend(["-e", f"{k}={v}"])
-    argv.append(container_id)
+    argv.append(ctx.container_id)
     argv.append(resolved.path)
     argv.extend(resolved.args)
 
     try:
         os.execvp("docker", argv)
     except OSError as exc:
-        print(f"dcode: failed to exec docker: {exc}", file=sys.stderr)
+        print(f"idc: failed to exec docker: {exc}", file=sys.stderr)
         return 127
 
     return 0  # only reached when os.execvp is mocked in tests
