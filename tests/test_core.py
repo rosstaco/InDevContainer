@@ -263,6 +263,29 @@ class TestResolveWorktree:
         assert main == main_repo
         assert rel == Path(".worktrees/pr-34")
 
+    def test_resolves_worktree_when_foreign_gitdir_path_exists_on_host(self, tmp_path):
+        """Regression: a worktree created inside a devcontainer records a path
+        like /workspaces/<repo>/.git/worktrees/<name>.  On WSL (and similar
+        hosts) that path can *exist* as an unrelated directory, which used to
+        make resolution give up with an "external worktree" error.  Resolution
+        must instead find the real owning repo on the local filesystem.
+        """
+        main_repo, worktree = _make_worktree(tmp_path)
+
+        # An unrelated tree that mimics the recorded container path and which
+        # actually exists on the host (the WSL /workspaces case).
+        foreign = tmp_path / "workspaces" / "myapp"
+        (foreign / ".git" / "worktrees" / "pr-34").mkdir(parents=True)
+        (worktree / ".git").write_text(
+            f"gitdir: {foreign / '.git' / 'worktrees' / 'pr-34'}\n"
+        )
+
+        result = resolve_worktree(worktree)
+        assert result is not None
+        main, rel = result
+        assert main == main_repo
+        assert rel == Path(".worktrees/pr-34")
+
 
 class TestRunDcodeWorktree:
     def test_worktree_uses_main_repo_host_path(self, tmp_path):
