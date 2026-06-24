@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/rosstaco/InDevContainer/compare/v1.0.0...v1.0.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* resolve worktrees whose recorded gitdir path exists on the host ([#13](https://github.com/rosstaco/InDevContainer/issues/13)) ([357a186](https://github.com/rosstaco/InDevContainer/commit/357a186824ecfc43d81356ddbcbb1c18d4205ffb))
+
 ## [1.0.0](https://github.com/rosstaco/dcode/compare/v0.5.1...v1.0.0) (2026-05-28)
 
 
