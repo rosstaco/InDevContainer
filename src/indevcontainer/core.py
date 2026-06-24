@@ -48,18 +48,24 @@ def resolve_worktree(target: Path) -> tuple[Path, Path] | None:
 
     # Worktrees point to <repo>/.git/worktrees/<name>.
     # Submodules point to <repo>/.git/modules/<name> — reject those.
+    # This structural check works even when the recorded path is foreign
+    # (e.g. a container path) and therefore absent on this host.
     if gitdir.parent.name != "worktrees" or gitdir.parent.parent.name != ".git":
         return None
 
-    main_repo = gitdir.parent.parent.parent  # <repo>/.git/worktrees/<n> → <repo>
-
-    # The gitdir may contain an absolute path from a different environment
-    # (e.g. a container path when running on the host).  Fall back to
-    # walking the filesystem when the derived main_repo doesn't exist.
-    if not main_repo.is_dir():
-        main_repo = _find_repo_root(target)
-        if main_repo is None:
-            return None
+    # The path recorded in a worktree's .git file may come from a different
+    # environment (e.g. a devcontainer's /workspaces/... path).  That path can
+    # be missing — or even coincidentally present as an unrelated directory —
+    # on the current host, so it can't be trusted to locate the owning repo.
+    # Resolve the repo on the *local* filesystem first by walking up from the
+    # target, and only fall back to the recorded path when no local ancestor
+    # repository is found.
+    main_repo = _find_repo_root(target)
+    if main_repo is None:
+        gitdir_main = gitdir.parent.parent.parent  # <repo>/.git/worktrees/<n> → <repo>
+        main_repo = gitdir_main if gitdir_main.is_dir() else None
+    if main_repo is None:
+        return None
 
     try:
         rel_path = target.relative_to(main_repo)
