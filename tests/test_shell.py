@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import shlex
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -13,6 +14,7 @@ from conftest import _make_worktree
 from indevcontainer.shell import (
     ContainerLookup,
     ResolvedShell,
+    VSCodeBridges,
     _build_missing_container,
     _inspect_container_metadata,
     _load_jsonc,
@@ -22,6 +24,7 @@ from indevcontainer.shell import (
     detect_login_shell,
     find_container,
     find_ssh_socket,
+    find_vscode_bridges,
     get_user_settings_path,
     probe_workdir,
     resolve_terminal_profile,
@@ -656,6 +659,70 @@ class TestFindSshSocket:
 
 
 # ---------------------------------------------------------------------------
+# find_vscode_bridges
+# ---------------------------------------------------------------------------
+
+
+class TestFindVscodeBridges:
+    def test_all_three_found(self):
+        out = (
+            "/tmp/vscode-ipc-9.sock\n"
+            "/home/node/.vscode-server/bin/abc/bin/helpers/browser-linux.sh\n"
+            "/home/node/.vscode-server/bin/abc/bin/remote-cli\n"
+        )
+        with patch("indevcontainer.shell.subprocess.run", return_value=_completed(0, out, "")):
+            b = find_vscode_bridges("cid", "node")
+        assert b.ipc_sock == "/tmp/vscode-ipc-9.sock"
+        assert b.browser_helper.endswith("/helpers/browser-linux.sh")
+        assert b.remote_cli_dir.endswith("/bin/remote-cli")
+
+    def test_none_found_blank_lines(self):
+        with patch("indevcontainer.shell.subprocess.run", return_value=_completed(0, "\n\n\n", "")):
+            b = find_vscode_bridges("cid", "node")
+        assert b == VSCodeBridges()
+
+    def test_partial_ipc_only(self):
+        out = "/tmp/vscode-ipc-1.sock\n\n\n"
+        with patch("indevcontainer.shell.subprocess.run", return_value=_completed(0, out, "")):
+            b = find_vscode_bridges("cid", None)
+        assert b.ipc_sock == "/tmp/vscode-ipc-1.sock"
+        assert b.browser_helper is None
+        assert b.remote_cli_dir is None
+
+    def test_short_output_pads(self):
+        # Fewer than three lines must not IndexError.
+        with patch("indevcontainer.shell.subprocess.run", return_value=_completed(0, "", "")):
+            assert find_vscode_bridges("cid", None) == VSCodeBridges()
+
+    def test_exec_user_passed_as_u_flag(self):
+        with patch(
+            "indevcontainer.shell.subprocess.run", return_value=_completed(0, "\n\n\n", "")
+        ) as m:
+            find_vscode_bridges("cid", "vscode")
+        argv = m.call_args.args[0]
+        assert argv[:2] == ["docker", "exec"]
+        i = argv.index("-u")
+        assert argv[i + 1] == "vscode"
+        assert "sh" in argv and "-c" in argv
+
+    def test_no_u_flag_when_user_none(self):
+        with patch(
+            "indevcontainer.shell.subprocess.run", return_value=_completed(0, "\n\n\n", "")
+        ) as m:
+            find_vscode_bridges("cid", None)
+        argv = m.call_args.args[0]
+        assert "-u" not in argv
+
+    def test_nonzero_rc_returns_empty(self):
+        with patch("indevcontainer.shell.subprocess.run", return_value=_completed(1, "x\ny\nz\n", "")):
+            assert find_vscode_bridges("cid", None) == VSCodeBridges()
+
+    def test_oserror_returns_empty(self):
+        with patch("indevcontainer.shell.subprocess.run", side_effect=OSError("boom")):
+            assert find_vscode_bridges("cid", None) == VSCodeBridges()
+
+
+# ---------------------------------------------------------------------------
 # probe_workdir
 # ---------------------------------------------------------------------------
 
@@ -705,6 +772,7 @@ class _RunShellHarness:
         isatty: bool = True,
         execvp_side_effect=None,
         metadata_entries: list | None = None,
+        bridges: VSCodeBridges | None = None,
     ):
         self.container_id = container_id
         self.ssh_sock = ssh_sock
@@ -714,6 +782,7 @@ class _RunShellHarness:
         self.isatty = isatty
         self.execvp = MagicMock(side_effect=execvp_side_effect)
         self.metadata_entries = metadata_entries if metadata_entries is not None else []
+        self.bridges = bridges if bridges is not None else VSCodeBridges()
 
     def __enter__(self):
         self._patches = [
@@ -726,6 +795,10 @@ class _RunShellHarness:
                 return_value=list(self.metadata_entries),
             ),
             patch("indevcontainer.shell.find_ssh_socket", return_value=self.ssh_sock),
+            patch(
+                "indevcontainer.shell.find_vscode_bridges",
+                return_value=self.bridges,
+            ),
             patch("indevcontainer.shell.probe_workdir", return_value=self.workdir),
             patch("indevcontainer.shell.resolve_terminal_profile", return_value=self.profile),
             patch("indevcontainer.shell.detect_login_shell", return_value=self.login_shell),
@@ -846,6 +919,89 @@ class TestRunShell:
         # container id immediately precedes shell path
         assert argv[-4] == "cid123"
 
+    def test_browser_env_forwarded(self, tmp_path):
+        proj = _make_project(tmp_path)
+        bridges = VSCodeBridges(
+            ipc_sock="/tmp/vscode-ipc-1.sock",
+            browser_helper="/srv/helpers/browser-linux.sh",
+        )
+        with _RunShellHarness(bridges=bridges) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        argv = h.execvp.call_args.args[1]
+        assert "VSCODE_IPC_HOOK_CLI=/tmp/vscode-ipc-1.sock" in argv
+        assert "BROWSER=/srv/helpers/browser-linux.sh" in argv
+
+    def test_remote_cli_wraps_shell_for_path(self, tmp_path):
+        proj = _make_project(tmp_path)
+        cli_dir = "/home/node/.vscode-server/bin/abc/bin/remote-cli"
+        bridges = VSCodeBridges(ipc_sock="/tmp/s.sock", remote_cli_dir=cli_dir)
+        with _RunShellHarness(bridges=bridges) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        argv = h.execvp.call_args.args[1]
+        expected_inner = (
+            f"export PATH={shlex.quote(cli_dir)}:$PATH; exec {shlex.join(['/bin/bash'])}"
+        )
+        assert argv[-4:] == ["cid123", "sh", "-c", expected_inner]
+
+    def test_remote_cli_wrapper_includes_profile_args(self, tmp_path):
+        proj = _make_project(tmp_path)
+        cli_dir = "/srv/remote-cli"
+        prof = ResolvedShell(path="/bin/zsh", args=("-l",))
+        bridges = VSCodeBridges(remote_cli_dir=cli_dir)
+        with _RunShellHarness(profile=prof, bridges=bridges) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        argv = h.execvp.call_args.args[1]
+        expected_inner = (
+            f"export PATH={shlex.quote(cli_dir)}:$PATH; "
+            f"exec {shlex.join(['/bin/zsh', '-l'])}"
+        )
+        assert argv[-3:] == ["sh", "-c", expected_inner]
+
+    def test_browser_helper_adds_xdg_open_shim(self, tmp_path):
+        proj = _make_project(tmp_path)
+        bridges = VSCodeBridges(
+            ipc_sock="/tmp/s.sock",
+            browser_helper="/srv/helpers/browser-linux.sh",
+        )
+        with _RunShellHarness(bridges=bridges) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        argv = h.execvp.call_args.args[1]
+        assert argv[-3:-1] == ["sh", "-c"]
+        inner = argv[-1]
+        # Materializes an xdg-open shim that exec's the VS Code browser helper.
+        assert "xdg-open" in inner
+        assert "/srv/helpers/browser-linux.sh" in inner
+        assert inner.endswith("exec /bin/bash")
+
+    def test_browser_and_remote_cli_both_prepended(self, tmp_path):
+        proj = _make_project(tmp_path)
+        bridges = VSCodeBridges(
+            browser_helper="/srv/browser-linux.sh",
+            remote_cli_dir="/srv/remote-cli",
+        )
+        with _RunShellHarness(bridges=bridges) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        inner = h.execvp.call_args.args[1][-1]
+        # Shim dir is prepended ahead of the remote-cli dir.
+        assert 'export PATH="$__idc_d":/srv/remote-cli:$PATH' in inner
+
+    def test_no_bridges_no_browser_env_or_wrapper(self, tmp_path):
+        proj = _make_project(tmp_path)
+        with _RunShellHarness(bridges=VSCodeBridges()) as h:
+            run_shell(str(proj), insiders=False, shell_override=None)
+        argv = h.execvp.call_args.args[1]
+        assert not any(a.startswith("BROWSER=") for a in argv)
+        assert not any(a.startswith("VSCODE_IPC_HOOK_CLI=") for a in argv)
+        # No wrapper: shell path is the final token, not wrapped in `sh -c`.
+        assert argv[-2:] == ["cid123", "/bin/bash"]
+
+    def test_vscode_not_connected_warns(self, tmp_path, capsys):
+        proj = _make_project(tmp_path)
+        with _RunShellHarness(bridges=VSCodeBridges()):
+            run_shell(str(proj), insiders=False, shell_override=None)
+        err = capsys.readouterr().err
+        assert "VS Code not connected" in err
+
     def test_shell_override_uses_path_with_no_args_or_env(self, tmp_path):
         proj = _make_project(tmp_path)
         with _RunShellHarness() as h:
@@ -915,6 +1071,10 @@ class TestRunShell:
         with (
             patch("indevcontainer.shell.find_container", find_mock),
             patch("indevcontainer.shell.find_ssh_socket", return_value=None),
+            patch(
+                "indevcontainer.shell.find_vscode_bridges",
+                return_value=VSCodeBridges(),
+            ),
             patch("indevcontainer.shell.probe_workdir", probe_mock),
             patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
             patch("indevcontainer.shell.detect_login_shell", return_value="/bin/sh"),
@@ -963,6 +1123,10 @@ class TestRunShellStoppedPrompt:
             patch("indevcontainer.shell.subprocess.run", start),
             patch("indevcontainer.shell._inspect_container_metadata", return_value=[]),
             patch("indevcontainer.shell.find_ssh_socket", return_value="/host/ssh.sock"),
+            patch(
+                "indevcontainer.shell.find_vscode_bridges",
+                return_value=VSCodeBridges(),
+            ),
             patch("indevcontainer.shell.probe_workdir", return_value="/workspaces/proj"),
             patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
             patch("indevcontainer.shell.detect_login_shell", return_value="/bin/bash"),
@@ -1231,6 +1395,10 @@ class TestRunShellMissingBuild:
                 return_value=proj_metadata,
             ),
             patch("indevcontainer.shell.find_ssh_socket", return_value="/host/ssh.sock"),
+            patch(
+                "indevcontainer.shell.find_vscode_bridges",
+                return_value=VSCodeBridges(),
+            ),
             patch("indevcontainer.shell.probe_workdir", return_value="/workspaces/proj"),
             patch("indevcontainer.shell.resolve_terminal_profile", return_value=None),
             patch("indevcontainer.shell.detect_login_shell", return_value="/bin/bash"),

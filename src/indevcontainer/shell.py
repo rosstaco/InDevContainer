@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -432,6 +433,77 @@ def find_ssh_socket(container_id: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# VS Code remote bridge discovery (host-browser passthrough + `code` shim)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class VSCodeBridges:
+    """VS Code remote-server bridges discovered inside a running container.
+
+    These are the artefacts a *connected* VS Code window leaves in the
+    container, mirroring how ``find_ssh_socket`` finds the SSH relay: they all
+    exist only while VS Code is attached and disappear on disconnect.
+
+    * ``ipc_sock`` → injected as ``VSCODE_IPC_HOOK_CLI``; the unix socket the
+      ``code`` shim and the ``BROWSER`` helper talk to.
+    * ``browser_helper`` → injected as ``BROWSER``; the ``helpers/browser-*.sh``
+      script that forwards ``--openExternal <url>`` to the host browser.
+    * ``remote_cli_dir`` → prepended to ``PATH`` so ``code`` resolves.
+    """
+
+    ipc_sock: str | None = None
+    browser_helper: str | None = None
+    remote_cli_dir: str | None = None
+
+
+# One probe, three lines out. Resolves $HOME first (often unset under
+# `docker exec -u`), then prints the newest *validated* IPC socket, browser
+# helper, and remote-cli dir — an empty line for any bridge that's absent, so
+# the three slots always parse positionally.
+_VSCODE_BRIDGE_PROBE = (
+    'h="${HOME:-$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6)}"\n'
+    's=$(ls -t /tmp/vscode-ipc-*.sock 2>/dev/null | head -1); '
+    '[ -S "$s" ] && echo "$s" || echo\n'
+    'b=$(ls -t "$h"/.vscode-server*/bin/*/bin/helpers/browser-linux.sh '
+    '"$h"/.vscode-server*/bin/*/bin/helpers/browser.sh 2>/dev/null | head -1); '
+    '[ -x "$b" ] && echo "$b" || echo\n'
+    'c=$(ls -td "$h"/.vscode-server*/bin/*/bin/remote-cli 2>/dev/null | head -1); '
+    '[ -d "$c" ] && echo "$c" || echo\n'
+)
+
+
+def find_vscode_bridges(container_id: str, exec_user: str | None) -> VSCodeBridges:
+    """Discover VS Code remote-server bridges inside a running container.
+
+    Runs a single ``docker exec [-u <user>] sh -c`` probe (as the same user the
+    real exec will use, so ``$HOME`` and the server install path resolve
+    correctly). Every field is ``None`` unless a VS Code window is currently
+    connected. Never raises — returns an empty :class:`VSCodeBridges` on any
+    docker/parse failure.
+    """
+    argv = ["docker", "exec"]
+    if exec_user:
+        argv.extend(["-u", exec_user])
+    argv.extend([container_id, "sh", "-c", _VSCODE_BRIDGE_PROBE])
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False)
+    except (FileNotFoundError, OSError):
+        return VSCodeBridges()
+    if proc.returncode != 0:
+        return VSCodeBridges()
+
+    lines = proc.stdout.splitlines()
+    lines += [""] * (3 - len(lines))  # pad so missing trailing slots parse as ""
+    ipc, browser, remote_cli = lines[0].strip(), lines[1].strip(), lines[2].strip()
+    return VSCodeBridges(
+        ipc_sock=ipc or None,
+        browser_helper=browser or None,
+        remote_cli_dir=remote_cli or None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Working-directory probe
 # ---------------------------------------------------------------------------
 
@@ -661,6 +733,10 @@ class ContainerExec:
     agent socket to forward (or ``None``), and the parsed ``devcontainer.json``
     so callers can layer their own logic on top (e.g. terminal-profile
     resolution).
+
+    ``vscode_ipc`` / ``browser_helper`` / ``remote_cli_dir`` carry the VS Code
+    remote bridges (see :class:`VSCodeBridges`) used for host-browser
+    passthrough and the ``code`` shim; all ``None`` unless VS Code is connected.
     """
 
     container_id: str
@@ -671,6 +747,9 @@ class ContainerExec:
     devcontainer_cfg: dict
     main_repo: Path
     rel_path: Path | None
+    vscode_ipc: str | None = None
+    browser_helper: str | None = None
+    remote_cli_dir: str | None = None
 
 
 def prepare_container_exec(path: str) -> ContainerExec | None:
@@ -800,6 +879,15 @@ def prepare_container_exec(path: str) -> ContainerExec | None:
             file=sys.stderr,
         )
 
+    bridges = find_vscode_bridges(container_id, exec_user)
+    if bridges.ipc_sock is None:
+        print(
+            "idc: VS Code not connected — host-browser passthrough and the "
+            "`code` command are unavailable (open the project in VS Code to "
+            "enable)",
+            file=sys.stderr,
+        )
+
     if rel_path is not None:
         candidate_workdir = f"{workspace_folder}/{rel_path.as_posix()}"
     else:
@@ -815,7 +903,68 @@ def prepare_container_exec(path: str) -> ContainerExec | None:
         devcontainer_cfg=devcontainer_cfg,
         main_repo=main_repo,
         rel_path=rel_path,
+        vscode_ipc=bridges.ipc_sock,
+        browser_helper=bridges.browser_helper,
+        remote_cli_dir=bridges.remote_cli_dir,
     )
+
+
+# Browser-opener commands (besides `xdg-open`) that take a URL as their first
+# argument; we alias them all to the same shim so tools that call any of them
+# directly still reach the host browser.
+_BROWSER_SHIM_ALIASES = (
+    "x-www-browser gnome-open gnome-www-browser sensible-browser www-browser"
+)
+
+
+def _path_wrapper_argv(
+    command: list[str],
+    *,
+    browser_helper: str | None,
+    remote_cli_dir: str | None,
+) -> list[str] | None:
+    """Wrap *command* in ``sh -c`` to inject VS Code bridges onto ``PATH``.
+
+    A fresh ``docker exec`` doesn't inherit VS Code's terminal ``PATH``, so we
+    prepend, in the container, at process start:
+
+    * an ``xdg-open`` shim (plus common aliases) that ``exec``s the VS Code
+      browser helper — this rescues CLIs that call ``xdg-open`` directly and
+      ignore ``$BROWSER`` (e.g. Atlassian ``acli``), which neither VS Code nor
+      a plain ``$BROWSER`` export can forward; and
+    * VS Code's ``remote-cli`` dir so ``code`` resolves (callers that don't
+      want it — e.g. ``idc copilot`` — pass ``remote_cli_dir=None``).
+
+    Returns the ``["sh", "-c", <script>]`` argv tail, or ``None`` when there's
+    nothing to inject (so callers exec *command* directly). The wrapper is
+    POSIX ``sh`` regardless of the target shell, so the ``PATH`` export works
+    even when *command* is a shell with different syntax (fish/zsh).
+    """
+    prepends: list[str] = []
+    setup = ""
+    if browser_helper:
+        helper_q = shlex.quote(browser_helper)
+        # ${TMPDIR:-/tmp}/.idc-openers-<uid>: deterministic + per-user so it's
+        # reused across shells and avoids cross-user permission clashes. The
+        # `&&` chain degrades gracefully — if it fails, PATH is still exported
+        # and exec still happens.
+        setup = (
+            '__idc_d="${TMPDIR:-/tmp}/.idc-openers-$(id -u)"; '
+            'mkdir -p "$__idc_d" && '
+            "printf '#!/bin/sh\\nexec %s \"$@\"\\n' " + helper_q
+            + ' > "$__idc_d/xdg-open" && '
+            'chmod +x "$__idc_d/xdg-open" && '
+            "for __a in " + _BROWSER_SHIM_ALIASES + "; do "
+            'ln -sf xdg-open "$__idc_d/$__a"; done; '
+        )
+        prepends.append('"$__idc_d"')
+    if remote_cli_dir:
+        prepends.append(shlex.quote(remote_cli_dir))
+    if not prepends:
+        return None
+    path_expr = ":".join(prepends)
+    inner = f"{setup}export PATH={path_expr}:$PATH; exec {shlex.join(command)}"
+    return ["sh", "-c", inner]
 
 
 def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
@@ -850,11 +999,20 @@ def run_shell(path: str, *, insiders: bool, shell_override: str | None) -> int:
         argv.extend(["-w", ctx.workdir])
     if ctx.ssh_sock:
         argv.extend(["-e", f"SSH_AUTH_SOCK={ctx.ssh_sock}"])
+    if ctx.vscode_ipc:
+        argv.extend(["-e", f"VSCODE_IPC_HOOK_CLI={ctx.vscode_ipc}"])
+    if ctx.browser_helper:
+        argv.extend(["-e", f"BROWSER={ctx.browser_helper}"])
     for k, v in resolved.env:
         argv.extend(["-e", f"{k}={v}"])
     argv.append(ctx.container_id)
-    argv.append(resolved.path)
-    argv.extend(resolved.args)
+    command = [resolved.path, *resolved.args]
+    wrapper = _path_wrapper_argv(
+        command,
+        browser_helper=ctx.browser_helper,
+        remote_cli_dir=ctx.remote_cli_dir,
+    )
+    argv.extend(wrapper if wrapper is not None else command)
 
     try:
         os.execvp("docker", argv)

@@ -78,6 +78,23 @@ the devcontainer. `idc shell` detects the VS Code relay socket at
 `/tmp/vscode-ssh-auth-*.sock` and sets `SSH_AUTH_SOCK` on `docker exec`. If no
 socket is found, it prints a hint to open the project in VS Code first.
 
+Host-browser passthrough and the `code` command piggyback on the same connected
+VS Code session. When VS Code is attached, `idc shell` and `idc copilot` detect
+its CLI IPC socket (`/tmp/vscode-ipc-*.sock`) and browser helper, then set
+`VSCODE_IPC_HOOK_CLI` and `BROWSER` on `docker exec`. CLIs that open a browser
+to sign in (`az login`, `gh auth login`, `glab auth login`, `snowflake`, …) then
+launch your **host** browser, and the OAuth `localhost` callback completes via
+VS Code's automatic port forwarding — exactly like an integrated terminal.
+
+Some CLIs (notably Atlassian `acli`) call `xdg-open` directly and ignore
+`$BROWSER`, so they don't work even in a plain VS Code terminal. `idc` also
+drops an `xdg-open` shim (plus `x-www-browser`/`gnome-open`/`sensible-browser`
+aliases) ahead of `PATH` that forwards to the same VS Code browser helper, so
+those tools reach the host browser too. `idc shell` additionally prepends
+VS Code's `remote-cli` directory to `PATH` so `code <file>` opens in the
+connected window. All of this needs VS Code connected; otherwise `idc` prints a
+one-line hint and continues without it.
+
 ### `idc copilot [<path>] [copilot args...]`
 
 Exec the GitHub Copilot CLI (`copilot`) inside the project's running devcontainer.
