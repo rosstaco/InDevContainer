@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/rosstaco/InDevContainer/compare/v1.0.1...v1.1.0) (2026-06-30)
+
+
+### Features
+
+* **shell:** forward host-browser passthrough, xdg-open shim, and code bridge from connected VS Code ([#15](https://github.com/rosstaco/InDevContainer/issues/15)) ([b99902f](https://github.com/rosstaco/InDevContainer/commit/b99902f97d91dd9d424617b2de05d95f98b8a594))
+
 ## [1.0.1](https://github.com/rosstaco/InDevContainer/compare/v1.0.0...v1.0.1) (2026-06-24)
 
 
