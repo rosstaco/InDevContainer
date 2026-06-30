@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 
-from indevcontainer.shell import prepare_container_exec
+from indevcontainer.shell import _path_wrapper_argv, prepare_container_exec
 
 
 def _copilot_installed(container_id: str, exec_user: str | None) -> bool:
@@ -65,10 +65,18 @@ def run_copilot(path: str, *, extra_args: list[str] | None = None) -> int:
         argv.extend(["-w", ctx.workdir])
     if ctx.ssh_sock:
         argv.extend(["-e", f"SSH_AUTH_SOCK={ctx.ssh_sock}"])
+    if ctx.vscode_ipc:
+        argv.extend(["-e", f"VSCODE_IPC_HOOK_CLI={ctx.vscode_ipc}"])
+    if ctx.browser_helper:
+        argv.extend(["-e", f"BROWSER={ctx.browser_helper}"])
     argv.append(ctx.container_id)
-    argv.append("copilot")
-    if extra_args:
-        argv.extend(extra_args)
+    # `code` (remote_cli_dir) is shell-only, but the xdg-open shim applies here
+    # too so browser logins from tools copilot runs reach the host browser.
+    command = ["copilot", *(extra_args or [])]
+    wrapper = _path_wrapper_argv(
+        command, browser_helper=ctx.browser_helper, remote_cli_dir=None
+    )
+    argv.extend(wrapper if wrapper is not None else command)
 
     try:
         os.execvp("docker", argv)
